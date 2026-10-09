@@ -6,7 +6,8 @@
 <meta name="theme-color" content="#0a0a0a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>MicroScope Pro 100x — Industrial</title>
+<link rel="manifest" href="manifest.json">
+<title>MicroScope Pro 100x — Industrial v5</title>
 <style>
 :root{--bg:#0a0a0a;--panel:#141414;--panel-2:#222;--fg:#eee;--muted:#888;
 --accent:#00b3ff;--accent-2:#00e5a0;--danger:#ff3b30;--warn:#ffaa00;--ok:#22c55e}
@@ -22,6 +23,10 @@ transform-origin:center center;will-change:transform;display:block}
 #freezeCanvas{position:absolute;inset:0;width:100%;height:100%;
 object-fit:contain;display:none;pointer-events:none;z-index:5}
 #freezeCanvas.on{display:block}
+#refOverlay{position:absolute;inset:0;pointer-events:none;z-index:4;
+display:none;opacity:.5}
+#refOverlay.on{display:block}
+#refOverlay img{width:100%;height:100%;object-fit:contain}
 #grid,#crosshair{position:absolute;inset:0;pointer-events:none;
 opacity:0;transition:opacity .2s;z-index:3}
 #grid.on,#crosshair.on{opacity:1}
@@ -45,6 +50,7 @@ display:inline-flex;align-items:center;gap:4px;min-height:36px;white-space:nowra
 .chip.warn.active{background:var(--warn);color:#000;border-color:var(--warn)}
 .chip.danger.active{background:var(--danger);color:#fff;border-color:var(--danger)}
 .chip.ok.active{background:var(--ok);color:#000;border-color:var(--ok)}
+.chip.gemini{background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;border:none}
 #topBar{position:absolute;top:max(6px,env(safe-area-inset-top));left:6px;right:6px;
 display:flex;gap:6px;z-index:20;flex-wrap:wrap;pointer-events:none}
 #topBar>*{pointer-events:auto}
@@ -135,6 +141,7 @@ justify-content:space-between;align-items:center}
 padding:2px 6px;border-radius:8px;font-weight:700}
 .section h3 .badge.off{background:#444;color:#aaa}
 .section h3 .badge.ok{background:var(--ok);color:#000}
+.section h3 .badge.warn{background:var(--warn);color:#000}
 .row{display:flex;align-items:center;justify-content:space-between;
 padding:9px 0;gap:10px;border-bottom:1px solid rgba(255,255,255,.06)}
 .row label{font-size:13px;flex:1}
@@ -168,7 +175,7 @@ cursor:pointer}
 .btnRow button.primary{background:var(--accent);color:#000;border-color:var(--accent)}
 #logBox{background:#0a0a0a;border:1px solid rgba(255,255,255,.1);
 border-radius:8px;padding:8px;font-family:ui-monospace,monospace;
-font-size:10px;color:var(--muted);max-height:180px;overflow-y:auto;
+font-size:10px;color:var(--muted);max-height:200px;overflow-y:auto;
 line-height:1.5;white-space:pre-wrap;word-break:break-all}
 #logBox .err{color:var(--danger)}
 #logBox .warn{color:var(--warn)}
@@ -201,15 +208,92 @@ font-size:12px;font-weight:700;z-index:150;display:none;cursor:pointer;
 box-shadow:0 4px 20px rgba(0,179,255,.4)}
 #updateBanner.on{display:block}
 .hidden{display:none!important}
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);
-border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ================= TEST MODE ================= */
+#testPanel{position:fixed;inset:0;background:#0a0a0a;z-index:500;
+display:none;flex-direction:column;overflow:hidden}
+#testPanel.on{display:flex}
+#testHeader{padding:12px;padding-top:max(12px,env(safe-area-inset-top));
+background:#141414;display:flex;gap:8px;align-items:center;
+border-bottom:1px solid rgba(255,255,255,.1);flex-wrap:wrap}
+#testTitle{font-size:15px;font-weight:700;flex:1}
+#testContent{flex:1;overflow-y:auto;padding:12px;
+padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.testGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (min-width:600px){.testGrid{grid-template-columns:repeat(3,1fr)}}
+.testCard{background:#1a1a1a;border:1px solid rgba(255,255,255,.1);
+border-radius:12px;padding:16px;cursor:pointer;transition:background .2s;
+display:flex;flex-direction:column;gap:6px}
+.testCard:active{background:var(--accent);color:#000}
+.testCard .icon{font-size:28px}
+.testCard .name{font-size:13px;font-weight:700}
+.testCard .desc{font-size:11px;color:var(--muted);line-height:1.4}
+.testCard.running{border-color:var(--accent);background:#0a1a24}
+.testView{background:#141414;border-radius:12px;padding:16px;
+border:1px solid rgba(255,255,255,.1);min-height:300px}
+.testView h2{font-size:16px;margin-bottom:12px}
+.testView p{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.metric{display:flex;justify-content:space-between;padding:10px 0;
+border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
+.metric .val{color:var(--accent);font-weight:700;
+font-variant-numeric:tabular-nums}
+.metric.big{padding:20px 0}
+.metric.big .val{font-size:24px}
+.bigVal{font-size:42px;font-weight:800;color:var(--accent);
+text-align:center;font-variant-numeric:tabular-nums;margin:20px 0}
+.bigLabel{text-align:center;color:var(--muted);font-size:12px}
+.screenTest{position:fixed;inset:0;z-index:600;display:none;
+align-items:center;justify-content:center;cursor:pointer}
+.screenTest.on{display:flex}
+.screenTest .label{position:absolute;bottom:40px;left:50%;
+transform:translateX(-50%);color:#fff;font-size:14px;
+background:rgba(0,0,0,.5);padding:8px 16px;border-radius:20px}
+.vibrateGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;
+margin:12px 0}
+.vibrateGrid button{padding:20px;border-radius:10px;
+border:1px solid rgba(255,255,255,.15);background:#222;color:#fff;
+font-size:14px;font-weight:700;cursor:pointer}
+.vibrateGrid button:active{background:var(--accent);color:#000}
+.levelView{position:relative;height:220px;margin:20px 0;
+background:#0a0a0a;border-radius:12px;overflow:hidden;
+border:1px solid rgba(255,255,255,.1)}
+.levelCircle{position:absolute;left:50%;top:50%;
+transform:translate(-50%,-50%);width:80px;height:80px;
+border:3px solid var(--accent);border-radius:50%;transition:transform .1s}
+.levelCross{position:absolute;left:50%;top:50%;
+transform:translate(-50%,-50%);width:200px;height:200px;
+border:1px dashed rgba(255,255,255,.2);border-radius:50%}
+.levelBubble{position:absolute;left:50%;top:50%;
+transform:translate(-50%,-50%);width:30px;height:30px;
+background:var(--ok);border-radius:50%;transition:transform .08s;
+box-shadow:0 0 20px var(--ok)}
+.magnetCanvas{width:100%;height:220px;background:#0a0a0a;
+border-radius:12px;border:1px solid rgba(255,255,255,.1)}
+.touchGrid{position:relative;width:100%;height:400px;background:#0a0a0a;
+border-radius:12px;border:1px solid rgba(255,255,255,.1);overflow:hidden}
+.touchDot{position:absolute;width:50px;height:50px;border-radius:50%;
+background:rgba(0,179,255,.4);border:2px solid var(--accent);
+transform:translate(-50%,-50%);pointer-events:none;
+display:flex;align-items:center;justify-content:center;
+font-size:12px;font-weight:700;color:#fff}
+.batteryBar{width:100%;height:40px;background:#222;border-radius:8px;
+overflow:hidden;margin:12px 0;position:relative}
+.batteryFill{height:100%;background:linear-gradient(90deg,var(--ok),var(--accent));
+transition:width .3s}
+.batteryText{position:absolute;inset:0;display:flex;align-items:center;
+justify-content:center;font-weight:700;color:#000;text-shadow:0 0 4px #fff}
+.testActions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.testActions button{flex:1;min-width:100px;padding:12px;border-radius:10px;
+border:1px solid rgba(255,255,255,.15);background:#222;color:#fff;
+font-size:13px;font-weight:700;cursor:pointer}
+.testActions button.primary{background:var(--accent);color:#000}
 </style>
 </head>
 <body>
 
 <div id="stage">
   <video id="video" playsinline autoplay muted></video>
+  <img id="refOverlay" alt="">
   <canvas id="freezeCanvas"></canvas>
   <div id="grid"></div>
   <div id="crosshair"></div>
@@ -222,30 +306,32 @@ border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
   <button class="chip ok" id="afBtn">🎯 <span>AF</span></button>
   <button class="chip" id="focusLockBtn">📌 <span>Focus</span></button>
   <button class="chip" id="gridBtn">▦</button>
+  <button class="chip" id="crosshairBtn">✛</button>
+  <button class="chip" id="safeZoneBtn">▢</button>
   <button class="chip" id="freezeBtn">❄️</button>
   <button class="chip" id="flipBtn">🔄</button>
 </div>
 <button class="chip" id="fsBtn">⛶</button>
 
 <div class="sideSlider" id="zoomPanel">
-  <button class="pmBtn" id="zoomPlus" aria-label="zoom in">+</button>
+  <button class="pmBtn" id="zoomPlus">+</button>
   <div class="sideValue" id="zoomVal">1.0x</div>
   <input type="range" id="zoomSlider" min="1" max="100" step="0.1" value="1">
-  <button class="pmBtn" id="zoomMinus" aria-label="zoom out">−</button>
+  <button class="pmBtn" id="zoomMinus">−</button>
   <div class="sideLabel">ZOOM</div>
 </div>
 
 <div class="sideSlider" id="rightPanel">
   <div class="sideValue" id="focusVal">AF</div>
-  <button class="pmBtn" id="focusPlus" aria-label="focus up">+</button>
+  <button class="pmBtn" id="focusPlus">+</button>
   <input type="range" id="focusSlider" min="0" max="100" step="1" value="50">
-  <button class="pmBtn" id="focusMinus" aria-label="focus down">−</button>
+  <button class="pmBtn" id="focusMinus">−</button>
   <div class="sideLabel">FOCUS</div>
   <div style="height:4px"></div>
   <div class="sideValue" id="expoVal">0.0</div>
-  <button class="pmBtn" id="expoPlus" aria-label="ev up">+</button>
+  <button class="pmBtn" id="expoPlus">+</button>
   <input type="range" id="expoSlider" min="-4" max="4" step="0.1" value="0">
-  <button class="pmBtn" id="expoMinus" aria-label="ev down">−</button>
+  <button class="pmBtn" id="expoMinus">−</button>
   <div class="sideLabel">EV</div>
 </div>
 
@@ -268,6 +354,7 @@ border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
   <button class="ctrlBtn" id="galleryBtn" title="Save all">🖼️</button>
   <button class="ctrlBtn" id="recordBtn" title="Record">🎥</button>
   <button class="ctrlBtn" id="shutter" title="Capture"></button>
+  <button class="ctrlBtn" id="testBtn" title="Test Mode">🧪</button>
   <button class="ctrlBtn" id="aiBtn" title="AI Tools">🤖</button>
   <button class="ctrlBtn" id="settingsBtn" title="Settings">⚙️</button>
 </div>
@@ -282,22 +369,20 @@ border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
     <h3>Camera <span class="badge" id="camStatus">INIT</span></h3>
     <div class="row"><label>Resolution</label>
       <select id="resSelect">
-        <option value="12000x9000">108MP (12000×9000)</option>
-        <option value="8000x6000">48MP (8000×6000)</option>
-        <option value="3840x2160">4K (3840×2160)</option>
-        <option value="1920x1080" selected>FHD (1920×1080)</option>
-        <option value="1280x720">HD (1280×720)</option>
-        <option value="640x480">SD (640×480)</option>
+        <option value="12000x9000">108MP</option>
+        <option value="8000x6000">48MP</option>
+        <option value="3840x2160">4K</option>
+        <option value="3000x4000" selected>3K×4K</option>
+        <option value="1920x1080">FHD</option>
+        <option value="1280x720">HD</option>
       </select></div>
     <div class="row"><label>Facing</label>
       <select id="facingSelect">
         <option value="environment" selected>Back</option>
         <option value="user">Front</option>
       </select></div>
-    <div class="row"><label>Mic (for video notes)</label>
+    <div class="row"><label>Mic</label>
       <div class="toggle" id="micTgl"></div></div>
-    <div class="row"><label>Full sensor (108MP)</label>
-      <div class="toggle" id="fullResTgl"></div></div>
   </div>
 
   <div class="section">
@@ -315,7 +400,7 @@ border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
     <h3>White Balance <span class="badge" id="wbMode">auto</span></h3>
     <div class="row"><label>Auto WB</label><div class="toggle on" id="wbAutoTgl"></div></div>
     <div class="row"><label>Temp (K)</label>
-      <input type="range" id="wbRange" min="2000" max="9000" step="100" value="5500"></div>
+      <input type="range" id="wbRange" min="2850" max="7000" step="50" value="5000"></div>
   </div>
 
   <div class="section">
@@ -327,7 +412,7 @@ border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
 
   <div class="section">
     <h3>Zoom Behavior</h3>
-    <div class="row"><label>Zoom Smoothness</label>
+    <div class="row"><label>Smoothness</label>
       <input type="range" id="zoomSpeedRange" min="5" max="60" value="22"></div>
     <div class="row"><label>Max Zoom</label>
       <select id="maxZoomSelect">
@@ -336,30 +421,27 @@ border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
         <option value="50">50x</option>
         <option value="100" selected>100x</option>
       </select></div>
-    <div class="row"><label>± Step (% of range)</label>
+    <div class="row"><label>± Step %</label>
       <input type="range" id="zoomStepRange" min="1" max="20" value="5"></div>
   </div>
 
   <div class="section">
-    <h3>Local AI <span class="badge off" id="localAIStatus">NOT LOADED</span></h3>
-    <div class="row"><label>Load Model (~200MB)</label>
-      <button class="chip" id="loadLocalAIBtn">Load</button></div>
-    <div class="row"><label>WebGPU</label>
-      <span id="webgpuStatus" style="color:var(--muted);font-size:11px">checking…</span></div>
-    <div class="row"><label>Auto-identify on capture</label>
-      <div class="toggle" id="autoLocalAITgl"></div></div>
-  </div>
-
-  <div class="section">
-    <h3>AI Upscale</h3>
-    <div class="row"><label>Engine</label>
-      <select id="upscaleEngine">
-        <option value="canvas">Fast (canvas 2x)</option>
-        <option value="swin2sr" selected>Swin2SR (AI 2x)</option>
-        <option value="realesrgan">Real-ESRGAN (AI 4x)</option>
+    <h3>Gemini Vision AI <span class="badge" id="geminiStatus">NO KEY</span></h3>
+    <div class="row"><label>API Key</label>
+      <input type="text" id="geminiKey" placeholder="paste key"></div>
+    <div class="row"><label>Prompt preset</label>
+      <select id="geminiPrompt">
+        <option value="identify">Identify component</option>
+        <option value="damage">Detect damage</option>
+        <option value="repair">Repair steps</option>
+        <option value="full">Full analysis</option>
       </select></div>
-    <div class="row"><label>Upscale last photo</label>
-      <button class="chip" id="upscaleBtn">Upscale</button></div>
+    <div class="btnRow" style="margin-top:8px">
+      <button id="geminiTest" class="chip gemini">🧠 Analyze last photo</button>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">
+      Free key: aistudio.google.com/app/apikey
+    </div>
   </div>
 
   <div class="section">
@@ -386,22 +468,18 @@ border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
   </div>
 
   <div class="section">
-    <h3>Optional Online AI</h3>
-    <div class="row"><label>Gemini API Key</label>
-      <input type="text" id="geminiKey" placeholder="paste (optional)"></div>
-    <div class="row"><label>Auto-OCR on capture</label>
-      <div class="toggle" id="autoOcrTgl"></div></div>
-    <div class="row"><label>Auto-analyze on capture</label>
-      <div class="toggle" id="autoAnalyzeTgl"></div></div>
-    <div class="row"><label>Roboflow Key (PCB)</label>
-      <input type="text" id="roboflowKey" placeholder="paste (optional)"></div>
-  </div>
-
-  <div class="section">
     <h3>Photo Tools</h3>
     <div class="btnRow">
       <button id="annotateBtn">✏️ Annotate</button>
       <button id="voiceNoteBtn">🎤 Voice</button>
+    </div>
+    <div class="btnRow" style="margin-top:8px">
+      <button id="refSetBtn">📐 Set reference</button>
+      <button id="refClearBtn">Clear reference</button>
+    </div>
+    <div class="btnRow" style="margin-top:8px">
+      <button id="pdfBtn" class="primary">📄 PDF Report</button>
+      <button id="upscaleBtn">2x Upscale</button>
     </div>
   </div>
 
@@ -414,17 +492,17 @@ border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
     <h3>Diagnostics</h3>
     <div id="logBox">Boot…</div>
     <div class="btnRow" style="margin-top:10px">
-      <button id="clearLogs">Clear Logs</button>
-      <button id="runHealth">Health Check</button>
+      <button id="clearLogs">Clear</button>
+      <button id="runHealth">Health</button>
     </div>
   </div>
 
   <div class="section">
-    <h3>PWA</h3>
+    <h3>PWA <span class="badge" id="pwaStatus">…</span></h3>
     <div class="row"><label>App version</label>
-      <span style="color:var(--accent)" id="appVer">v2.0.0</span></div>
-    <div class="row"><label>Offline ready</label>
-      <span style="color:var(--ok)" id="offlineStatus">checking…</span></div>
+      <span style="color:var(--accent)" id="appVer">v5.0.0</span></div>
+    <div class="row"><label>SW status</label>
+      <span id="offlineStatus">checking…</span></div>
     <div class="btnRow" style="margin-top:10px">
       <button id="checkUpdate">Check Update</button>
       <button id="reinstallSW">Reinstall SW</button>
@@ -434,21 +512,35 @@ border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
 
 <div id="modal">
   <div id="modalContent">
-    <h2 id="modalTitle">AI Tools</h2>
+    <h2 id="modalTitle">Info</h2>
     <p id="modalDesc"></p>
     <div class="result hidden" id="modalResult"></div>
     <div class="actions">
       <button id="modalClose">Close</button>
-      <button id="modalAction" class="primary">Analyze</button>
+      <button id="modalAction" class="primary">OK</button>
     </div>
   </div>
+</div>
+
+<!-- ================= TEST PANEL ================= -->
+<div id="testPanel">
+  <div id="testHeader">
+    <button class="chip" id="testBack">← Back</button>
+    <div id="testTitle">🧪 Hardware Test Suite</div>
+  </div>
+  <div id="testContent"></div>
+</div>
+
+<!-- Screen test overlay -->
+<div class="screenTest" id="screenTestOverlay">
+  <div class="label" id="screenTestLabel">Tap to change color</div>
 </div>
 
 <div id="updateBanner">🔄 New version — tap to update</div>
 <div id="toast"></div>
 
 <script>
-/* LOGGER */
+/* ================= LOGGER ================= */
 const LOG = (() => {
   const box = () => document.getElementById('logBox');
   const push = (lvl, ...args) => {
@@ -456,8 +548,7 @@ const LOG = (() => {
     const msg = args.map(a =>
       typeof a === 'object' ? JSON.stringify(a).slice(0,200) : String(a)
     ).join(' ');
-    const el = box();
-    if (!el) return;
+    const el = box(); if (!el) return;
     const line = document.createElement('div');
     line.className = lvl === 'err' ? 'err' : lvl === 'warn' ? 'warn' : lvl === 'ok' ? 'ok' : '';
     line.textContent = `[${ts}] ${lvl.toUpperCase()}: ${msg}`;
@@ -476,13 +567,15 @@ const LOG = (() => {
 window.addEventListener('error', e => LOG.err('window:', e.message));
 window.addEventListener('unhandledrejection', e => LOG.err('promise:', e.reason?.message || e.reason));
 
-const APP_VERSION = 'v2.0.0';
+/* ================= GLOBALS ================= */
+const APP_VERSION = 'v5.0.0';
 let stream = null, videoTrack = null, imageCapture = null;
 let caps = {};
 let mediaRecorder = null, recordedChunks = [];
 let recStartTime = 0, recTimer = null;
 let capturedPhotos = [];
-let wantAudio = false, useFullRes = false;
+let wantAudio = false;
+let refImageURL = null;
 
 let hwZoomMin = 1, hwZoomMax = 1;
 let maxZoomTotal = 100;
@@ -499,16 +592,9 @@ let capsExpoComp = null, isExpoLocked = false;
 let isTorchOn = false, afAssistOn = false;
 let pinch = null, lastTapTime = 0, tapTimeout = null;
 
-let localAIPipe = null, localAIReady = false;
-let webgpuAvailable = false, autoLocalAI = false;
-let upscaleEngine = 'swin2sr';
-
 let mmPerPixel = null, measurePoints = [], measureActive = false;
 let measureOverlay = null, calibrationMode = false;
-
-let geminiKey = '', autoOcr = false, autoAnalyze = false;
-let roboflowKey = '';
-let tesseractLoaded = false;
+let geminiKey = '', geminiPromptPreset = 'identify';
 let voiceRecorder = null, voiceChunks = [];
 
 let vs = { bright:100, contrast:100, sat:100, sharp:100,
@@ -517,6 +603,7 @@ let vs = { bright:100, contrast:100, sat:100, sharp:100,
 const $ = id => document.getElementById(id);
 const stage=$('stage'), video=$('video'),
       freezeCanvas=$('freezeCanvas'),
+      refOverlay=$('refOverlay'),
       gridEl=$('grid'), crossEl=$('crosshair'), safeEl=$('safeZone'),
       zoomSlider=$('zoomSlider'), zoomVal=$('zoomVal'),
       focusSlider=$('focusSlider'), focusVal=$('focusVal'),
@@ -524,13 +611,11 @@ const stage=$('stage'), video=$('video'),
       settingsPanel=$('settingsPanel');
 
 function toast(msg, ms=1600) {
-  const t = $('toast');
-  t.textContent = msg;
+  const t = $('toast'); t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.remove('show'), ms);
 }
-
 function showStatus() {
   const p = $('statusPill');
   $('spZoom').textContent = currentZoom.toFixed(1) + 'x';
@@ -540,20 +625,15 @@ function showStatus() {
   clearTimeout(showStatus._t);
   showStatus._t = setTimeout(() => p.classList.remove('show'), 1500);
 }
-
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 async function safeApply(constraints, label='') {
   if (!videoTrack) return false;
-  try {
-    await videoTrack.applyConstraints(constraints);
-    return true;
-  } catch (e) {
-    LOG.warn('applyConstraints failed', label, e.message);
-    return false;
-  }
+  try { await videoTrack.applyConstraints(constraints); return true; }
+  catch (e) { LOG.warn('apply failed', label, e.message); return false; }
 }
 
+/* ================= CAMERA ================= */
 async function startCamera() {
   const res = $('resSelect').value;
   const facing = $('facingSelect').value;
@@ -567,7 +647,6 @@ async function startCamera() {
     zoom: true, focusMode: 'continuous',
     exposureMode: 'continuous', whiteBalanceMode: 'continuous'
   };
-  if (useFullRes) vc.resizeMode = 'none';
 
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: vc, audio: wantAudio });
@@ -611,7 +690,7 @@ async function startCamera() {
     if (caps.colorTemperature) {
       const ct = caps.colorTemperature;
       $('wbRange').min = ct.min; $('wbRange').max = ct.max;
-      $('wbRange').step = ct.step ?? 100; $('wbRange').value = 5500;
+      $('wbRange').step = ct.step ?? 100; $('wbRange').value = 5000;
     }
     applyVisualTransforms(1); renderZoom(); updatePmButtons();
   } catch (err) {
@@ -637,17 +716,13 @@ function setTargetZoom(z) {
   targetZoom = clamp(z, hwZoomMin, maxZoomTotal);
   if (!zoomRAF) zoomRAF = requestAnimationFrame(animateZoomStep);
 }
-
 function animateZoomStep() {
   const diff = targetZoom - currentZoom;
-  if (Math.abs(diff) < 0.002) {
-    currentZoom = targetZoom; renderZoom(); zoomRAF = null; return;
-  }
+  if (Math.abs(diff) < 0.002) { currentZoom = targetZoom; renderZoom(); zoomRAF = null; return; }
   currentZoom += diff * zoomLerp;
   renderZoom();
   zoomRAF = requestAnimationFrame(animateZoomStep);
 }
-
 function renderZoom() {
   const total = currentZoom;
   let hwZ = total, digZ = 1;
@@ -666,7 +741,6 @@ function renderZoom() {
   });
   updatePmButtons();
 }
-
 function doZoomStep(direction) {
   const range = maxZoomTotal - hwZoomMin;
   let step = Math.max(0.2, range * (zoomStep / 100));
@@ -674,12 +748,10 @@ function doZoomStep(direction) {
   setTargetZoom(targetZoom + direction * step);
   showStatus();
 }
-
 function updatePmButtons() {
   $('zoomPlus').disabled = targetZoom >= maxZoomTotal - 0.01;
   $('zoomMinus').disabled = targetZoom <= hwZoomMin + 0.01;
 }
-
 $('zoomPlus').addEventListener('click', () => doZoomStep(+1));
 $('zoomMinus').addEventListener('click', () => doZoomStep(-1));
 zoomSlider.addEventListener('input', () => setTargetZoom(parseFloat(zoomSlider.value)));
@@ -689,6 +761,7 @@ document.querySelectorAll('#presets button').forEach(b => {
   });
 });
 
+/* ================= FOCUS ================= */
 let focusApplyRAF = null;
 function applyFocusValue(v) {
   v = clamp(v, 0, 100);
@@ -712,14 +785,12 @@ function applyFocusValue(v) {
     }
   });
 }
-
 function enterManualFocus() {
   if (focusLocked) return;
   focusManual = true;
   lastFocusUserAction = Date.now();
   $('afBtn').classList.remove('active');
 }
-
 function scheduleAutoAf() {
   if (!autoAfAfter3s || focusLocked) return;
   clearTimeout(autoAfTimer);
@@ -729,7 +800,6 @@ function scheduleAutoAf() {
     resumeContinuousAF(true);
   }, 3000);
 }
-
 async function resumeContinuousAF(silent = false) {
   if (!videoTrack) return;
   clearTimeout(autoAfTimer);
@@ -743,13 +813,11 @@ async function resumeContinuousAF(silent = false) {
   }
   showStatus();
 }
-
 function doFocusStep(direction) {
   enterManualFocus();
   const v = clamp(parseFloat(focusSlider.value) + direction * 3, 0, 100);
   applyFocusValue(v); showStatus(); scheduleAutoAf();
 }
-
 $('focusPlus').addEventListener('click', () => doFocusStep(+1));
 $('focusMinus').addEventListener('click', () => doFocusStep(-1));
 focusSlider.addEventListener('input', () => {
@@ -777,6 +845,7 @@ $('focusLockBtn').addEventListener('click', async () => {
   showStatus();
 });
 
+/* ================= EXPOSURE ================= */
 let expoApplyRAF = null;
 function applyExposureValue(v) {
   if (!capsExpoComp) return;
@@ -790,12 +859,10 @@ function applyExposureValue(v) {
   });
   showStatus();
 }
-
 function doExpoStep(direction) {
   const stepSize = Math.max(capsExpoComp?.step || 0.1, 0.3);
   applyExposureValue(parseFloat(expoSlider.value) + direction * stepSize);
 }
-
 $('expoPlus').addEventListener('click', () => doExpoStep(+1));
 $('expoMinus').addEventListener('click', () => doExpoStep(-1));
 expoSlider.addEventListener('input', () => applyExposureValue(parseFloat(expoSlider.value)));
@@ -813,26 +880,27 @@ $('expoLockBtn').addEventListener('click', async () => {
   } else isExpoLocked = !isExpoLocked;
 });
 
+/* ================= TRANSFORMS ================= */
 function applyVisualTransforms(digitalScale = 1) {
   const parts = [`scale(${digitalScale})`];
   if (vs.mirrorH) parts.push('scaleX(-1)');
   if (vs.mirrorV) parts.push('scaleY(-1)');
   if (vs.rotate180) parts.push('rotate(180deg)');
   video.style.transform = parts.join(' ');
-  video.style.filter = `brightness(${vs.bright}%) contrast(${vs.contrast}%) ` +
-    `saturate(${vs.sat}%)`;
+  const sharp = (vs.sharp - 100) / 100;
+  const blurPx = sharp < 0 ? Math.abs(sharp) * 0.6 : 0;
+  const contrast = 1 + (sharp > 0 ? sharp * 0.15 : 0);
+  video.style.filter = `brightness(${vs.bright}%) contrast(${(vs.contrast/100) * contrast * 100}%) saturate(${vs.sat}%) ${blurPx > 0 ? `blur(${blurPx}px)` : ''}`;
   freezeCanvas.style.filter = video.style.filter;
+  refOverlay.style.filter = video.style.filter;
 }
 
-function getTouchDist(a, b) {
-  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-}
-
+/* ================= PINCH / TAP ================= */
+function getTouchDist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
 stage.addEventListener('touchstart', e => {
   if (e.touches.length === 2) {
     e.preventDefault();
-    pinch = { startDist: getTouchDist(e.touches[0], e.touches[1]),
-              startZoom: targetZoom };
+    pinch = { startDist: getTouchDist(e.touches[0], e.touches[1]), startZoom: targetZoom };
   } else if (e.touches.length === 1) {
     const now = Date.now();
     if (now - lastTapTime < 280) {
@@ -849,7 +917,6 @@ stage.addEventListener('touchstart', e => {
     }
   }
 }, { passive: false });
-
 stage.addEventListener('touchmove', e => {
   if (e.touches.length === 2 && pinch) {
     e.preventDefault();
@@ -857,11 +924,7 @@ stage.addEventListener('touchmove', e => {
     setTargetZoom(pinch.startZoom * (dist / pinch.startDist));
   }
 }, { passive: false });
-
-stage.addEventListener('touchend', e => {
-  if (e.touches.length < 2) pinch = null;
-}, { passive: true });
-
+stage.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; }, { passive: true });
 stage.addEventListener('wheel', e => {
   e.preventDefault();
   setTargetZoom(targetZoom + (-Math.sign(e.deltaY) * 0.35 * maxZoomTotal / 10));
@@ -873,28 +936,23 @@ async function doTapFocus(clientX, clientY) {
   const x = (clientX - rect.left) / rect.width;
   const y = (clientY - rect.top) / rect.height;
   const ok = await safeApply({
-    advanced: [
-      { pointsOfInterest: [{ x, y }] },
-      { focusMode: 'single-shot' }
-    ]
+    advanced: [{ pointsOfInterest: [{ x, y }] }, { focusMode: 'single-shot' }]
   }, 'tapFocus');
   if (ok) { showFocusRing(clientX, clientY); scheduleAutoAf(); }
 }
-
 function showFocusRing(x, y) {
   const ring = document.createElement('div');
-  ring.style.cssText = `position:fixed;left:${x}px;top:${y}px;
-    width:60px;height:60px;border:2px solid var(--accent);
-    border-radius:50%;transform:translate(-50%,-50%) scale(1.4);
-    pointer-events:none;z-index:30;
+  ring.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:60px;height:60px;
+    border:2px solid var(--accent);border-radius:50%;
+    transform:translate(-50%,-50%) scale(1.4);pointer-events:none;z-index:30;
     transition:transform .3s,opacity .3s;opacity:1`;
   document.body.appendChild(ring);
-  requestAnimationFrame(() => ring.style.transform =
-    'translate(-50%,-50%) scale(1)');
+  requestAnimationFrame(() => ring.style.transform = 'translate(-50%,-50%) scale(1)');
   setTimeout(() => ring.style.opacity = 0, 700);
   setTimeout(() => ring.remove(), 1100);
 }
 
+/* ================= TOGGLES ================= */
 $('torchBtn').addEventListener('click', async () => {
   if (!videoTrack || !caps.torch) return;
   isTorchOn = !isTorchOn;
@@ -902,12 +960,10 @@ $('torchBtn').addEventListener('click', async () => {
   if (ok) $('torchBtn').classList.toggle('active', isTorchOn);
   else isTorchOn = !isTorchOn;
 });
-
 $('freezeBtn').addEventListener('click', () => {
   const on = !freezeCanvas.classList.contains('on');
   if (on) {
-    freezeCanvas.width = video.videoWidth;
-    freezeCanvas.height = video.videoHeight;
+    freezeCanvas.width = video.videoWidth; freezeCanvas.height = video.videoHeight;
     freezeCanvas.getContext('2d').drawImage(video, 0, 0);
     freezeCanvas.classList.add('on');
     $('freezeBtn').classList.add('active');
@@ -916,21 +972,25 @@ $('freezeBtn').addEventListener('click', () => {
     $('freezeBtn').classList.remove('active');
   }
 });
-
 $('flipBtn').addEventListener('click', () => {
-  $('facingSelect').value =
-    $('facingSelect').value === 'environment' ? 'user' : 'environment';
+  $('facingSelect').value = $('facingSelect').value === 'environment' ? 'user' : 'environment';
   startCamera();
 });
-
 $('gridBtn').addEventListener('click', () => {
   const on = gridEl.classList.toggle('on');
   $('gridBtn').classList.toggle('active', on);
-  $('gridTgl')?.classList.toggle('on', on);
+});
+$('crosshairBtn').addEventListener('click', () => {
+  const on = crossEl.classList.toggle('on');
+  $('crosshairBtn').classList.toggle('active', on);
+});
+$('safeZoneBtn').addEventListener('click', () => {
+  const on = safeEl.classList.toggle('on');
+  $('safeZoneBtn').classList.toggle('active', on);
 });
 
+/* ================= CAPTURE ================= */
 $('shutter').addEventListener('click', capturePhoto);
-
 async function capturePhoto() {
   if (!videoTrack) return;
   const flash = document.createElement('div');
@@ -947,25 +1007,13 @@ async function capturePhoto() {
     } else blob = await fallbackCapture();
     if (!blob) throw new Error('No data');
     const url = URL.createObjectURL(blob);
-    const item = { url, blob, ts: Date.now() };
-    capturedPhotos.push(item);
+    capturedPhotos.push({ url, blob, ts: Date.now() });
     toast('📸 Saved · ' + capturedPhotos.length);
-    if (autoOcr) runOCR(blob);
-    if (autoAnalyze && geminiKey) runGeminiAnalysis(blob);
-    if (autoLocalAI && localAIReady) {
-      toast('Local AI identify…');
-      const result = await identifyComponent(blob);
-      if (result) {
-        item.aiResult = result;
-        showModal('Component Identified', 'Local AI result:', result);
-      }
-    }
   } catch(e) {
     LOG.err('capture:', e.message);
     toast('Capture failed');
   }
 }
-
 async function fallbackCapture() {
   const c = document.createElement('canvas');
   c.width = video.videoWidth; c.height = video.videoHeight;
@@ -980,81 +1028,6 @@ async function fallbackCapture() {
   ctx.drawImage(video, 0, 0, c.width, c.height);
   ctx.restore();
   return new Promise(res => c.toBlob(b => res(b), 'image/jpeg', 0.95));
-}
-
-/* LOCAL AI */
-(async () => {
-  if ('gpu' in navigator) {
-    try {
-      const adapter = await navigator.gpu.requestAdapter();
-      webgpuAvailable = !!adapter;
-    } catch(e) { webgpuAvailable = false; }
-  }
-  const el = $('webgpuStatus');
-  if (el) {
-    el.textContent = webgpuAvailable ? '✓ Available' : '✗ CPU only';
-    el.style.color = webgpuAvailable ? 'var(--ok)' : 'var(--warn)';
-  }
-  LOG.info('WebGPU:', webgpuAvailable);
-})();
-
-async function loadLocalAI() {
-  if (localAIReady) return true;
-  $('localAIStatus').textContent = 'LOADING…';
-  $('localAIStatus').classList.remove('off');
-  try {
-    const { pipeline, env } = await import(
-      'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2'
-    );
-    env.allowLocalModels = false;
-    env.useBrowserCache = true;
-    localAIPipe = await pipeline(
-      'image-to-text',
-      'Xenova/SmolVLM-256M-Instruct',
-      {
-        dtype: 'q4',
-        device: webgpuAvailable ? 'webgpu' : 'wasm',
-        progress_callback: (p) => {
-          if (p.status === 'progress' && p.file) {
-            const pct = Math.round(p.progress || 0);
-            $('localAIStatus').textContent = `LOAD ${pct}%`;
-          }
-        }
-      }
-    );
-    localAIReady = true;
-    $('localAIStatus').textContent = 'READY ✓';
-    $('localAIStatus').classList.add('ok');
-    LOG.ok('Local AI loaded');
-    toast('Local AI ready');
-    return true;
-  } catch(e) {
-    LOG.err('Local AI:', e.message);
-    $('localAIStatus').textContent = 'ERROR';
-    toast('Load failed: ' + e.message);
-    return false;
-  }
-}
-
-async function identifyComponent(blob) {
-  if (!localAIReady) { const ok = await loadLocalAI(); if (!ok) return null; }
-  const dataUrl = await blobToDataURL(blob);
-  try {
-    const result = await localAIPipe(dataUrl, {
-      prompt: 'Identify the electronic component in this microscope image. ' +
-              'Read visible markings. Describe package and any damage.',
-      max_new_tokens: 180
-    });
-    return result[0].generated_text;
-  } catch(e) { LOG.err('identify:', e.message); return null; }
-}
-
-function blobToDataURL(blob) {
-  return new Promise(res => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.readAsDataURL(blob);
-  });
 }
 function blobToBase64(blob) {
   return new Promise((res, rej) => {
@@ -1073,269 +1046,64 @@ function blobToImage(blob) {
   });
 }
 
-$('loadLocalAIBtn').addEventListener('click', loadLocalAI);
-$('autoLocalAITgl').addEventListener('click', () => {
-  autoLocalAI = !autoLocalAI;
-  $('autoLocalAITgl').classList.toggle('on', autoLocalAI);
+/* ================= GEMINI ================= */
+$('geminiKey').addEventListener('input', e => {
+  geminiKey = e.target.value.trim();
+  updateGeminiStatus();
   saveSettings();
 });
-
-/* UPSCALE */
-$('upscaleEngine').addEventListener('change', e => {
-  upscaleEngine = e.target.value; saveSettings();
+$('geminiPrompt').addEventListener('change', e => {
+  geminiPromptPreset = e.target.value;
+  saveSettings();
 });
-$('upscaleBtn').addEventListener('click', async () => {
+function updateGeminiStatus() {
+  const s = $('geminiStatus');
+  if (geminiKey) { s.textContent = 'READY'; s.classList.add('ok'); s.classList.remove('off'); }
+  else { s.textContent = 'NO KEY'; s.classList.add('off'); s.classList.remove('ok'); }
+}
+$('geminiTest').addEventListener('click', () => {
   const last = capturedPhotos[capturedPhotos.length - 1];
   if (!last) { toast('Pehle photo lo'); return; }
-  await upscaleImage(last.blob, upscaleEngine);
+  runGeminiAnalysis(last.blob);
 });
-
-async function upscaleImage(blob, engine = 'canvas') {
-  showModal('Upscale', `Processing with ${engine}…`);
-  try {
-    let outBlob;
-    if (engine === 'canvas') outBlob = await canvasUpscale(blob, 2);
-    else {
-      try {
-        const { Upscaler } = await import(
-          'https://cdn.jsdelivr.net/npm/upscalejs@2.1.0/dist/upscalejs.js'
-        );
-        const upscaler = new Upscaler({
-          model: engine === 'swin2sr' ? 'Swin2SR' : 'RealESRGAN',
-          scale: engine === 'realesrgan' ? 4 : 2,
-          backend: webgpuAvailable ? 'webgpu' : 'wasm'
-        });
-        const bitmap = await createImageBitmap(blob);
-        const result = await upscaler.upscale(bitmap);
-        const c = document.createElement('canvas');
-        c.width = result.width; c.height = result.height;
-        c.getContext('2d').drawImage(result, 0, 0);
-        outBlob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.95));
-      } catch(e) {
-        LOG.warn('AI upscale failed:', e.message);
-        toast('AI unavailable — canvas fallback');
-        outBlob = await canvasUpscale(blob, 2);
-      }
-    }
-    if (outBlob) {
-      const url = URL.createObjectURL(outBlob);
-      capturedPhotos.push({ url, blob: outBlob, ts: Date.now(),
-        note: 'upscaled-' + engine });
-      toast('Upscaled saved');
-      $('modalClose').click();
-    }
-  } catch(e) {
-    LOG.err('upscale:', e.message);
-    showModal('Upscale Error', e.message);
-  }
-}
-
-async function canvasUpscale(blob, factor) {
-  const img = await blobToImage(blob);
-  const c = document.createElement('canvas');
-  c.width = img.width * factor; c.height = img.height * factor;
-  const ctx = c.getContext('2d');
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, c.width, c.height);
-  return new Promise(r => c.toBlob(r, 'image/jpeg', 0.95));
-}
-
-/* MEASURE */
-$('mmPerPixel').addEventListener('input', e => {
-  const v = parseFloat(e.target.value);
-  mmPerPixel = isNaN(v) ? null : v;
-  saveSettings();
-});
-$('rulerTgl').addEventListener('click', () => {
-  const on = !$('rulerTgl').classList.contains('on');
-  $('rulerTgl').classList.toggle('on', on);
-  if (on) enableMeasure(); else disableMeasure();
-});
-$('calibrateBtn').addEventListener('click', () => {
-  toast('Tap 2 points (e.g. 0402 = 1.0mm)');
-  calibrationMode = true;
-  enableMeasure();
-});
-$('clearMeasureBtn').addEventListener('click', () => {
-  measurePoints = [];
-  if (measureOverlay) measureOverlay.innerHTML = '';
-});
-
-function enableMeasure() {
-  if (!freezeCanvas.classList.contains('on')) {
-    toast('Pehle freeze karo (❄️)'); return;
-  }
-  if (!measureOverlay) {
-    measureOverlay = document.createElement('div');
-    measureOverlay.style.cssText = 'position:absolute;inset:0;z-index:10;' +
-      'pointer-events:none';
-    freezeCanvas.parentElement.appendChild(measureOverlay);
-  }
-  measureActive = true;
-  stage.addEventListener('click', handleMeasureClick);
-}
-
-function disableMeasure() {
-  measureActive = false;
-  stage.removeEventListener('click', handleMeasureClick);
-}
-
-function handleMeasureClick(e) {
-  if (!measureActive) return;
-  const rect = freezeCanvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / rect.width;
-  const y = (e.clientY - rect.top) / rect.height;
-  measurePoints.push({ x, y });
-  const dot = document.createElement('div');
-  dot.style.cssText = `position:absolute;left:${x*100}%;top:${y*100}%;` +
-    `width:10px;height:10px;background:var(--accent);border:2px solid #fff;` +
-    `border-radius:50%;transform:translate(-50%,-50%)`;
-  measureOverlay.appendChild(dot);
-  if (measurePoints.length === 2) {
-    const p1 = measurePoints[0], p2 = measurePoints[1];
-    const pixDist = Math.hypot(
-      (p2.x - p1.x) * freezeCanvas.width,
-      (p2.y - p1.y) * freezeCanvas.height
-    );
-    let label = `${pixDist.toFixed(0)} px`;
-    if (calibrationMode) {
-      const knownMM = prompt('Real size in mm?', '1.0');
-      if (knownMM) {
-        mmPerPixel = parseFloat(knownMM) / pixDist;
-        $('mmPerPixel').value = mmPerPixel.toFixed(5);
-        toast(`Calibrated: ${mmPerPixel.toFixed(5)} mm/px`);
-        saveSettings();
-      }
-      calibrationMode = false;
-    } else if (mmPerPixel) {
-      label = `${(pixDist * mmPerPixel).toFixed(3)} mm`;
-    }
-    const line = document.createElement('div');
-    const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
-    const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) * 100;
-    line.style.cssText = `position:absolute;left:${p1.x*100}%;top:${p1.y*100}%;` +
-      `width:${len}%;height:2px;background:var(--accent);` +
-      `transform-origin:0 0;transform:rotate(${angle}deg)`;
-    measureOverlay.appendChild(line);
-    const labelEl = document.createElement('div');
-    labelEl.textContent = label;
-    labelEl.style.cssText = `position:absolute;left:${(p1.x+p2.x)/2*100}%;` +
-      `top:${(p1.y+p2.y)/2*100}%;background:rgba(0,0,0,.8);color:#fff;` +
-      `padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;` +
-      `transform:translate(-50%,-50%);pointer-events:none`;
-    measureOverlay.appendChild(labelEl);
-    measurePoints = [];
-  }
-}
-
-/* LOOKUP */
-$('lookupBtn').addEventListener('click', async () => {
-  const part = $('partInput').value.trim();
-  if (!part) { toast('Part number likho'); return; }
-  $('partResult').textContent = 'Searching…';
-  try {
-    const r = await fetch(
-      `https://jlcsearch.tscircuit.com/api/search?q=${encodeURIComponent(part)}&limit=5`
-    );
-    if (!r.ok) throw new Error('API ' + r.status);
-    const data = await r.json();
-    const items = data.components || data.results || [];
-    if (!items.length) { $('partResult').textContent = 'Kuch nahi mila'; return; }
-    $('partResult').innerHTML = items.slice(0,5).map(c => {
-      const desc = c.description || c.mfr || 'No description';
-      const price = c.price ? `$${c.price}` : '';
-      const stock = c.stock ? ` · Stock: ${c.stock}` : '';
-      return `<div style="margin-bottom:6px;padding:6px;background:#1a1a1a;
-        border-radius:6px"><b style="color:var(--accent)">${
-        c.mfr_part || c.lcsc || part}</b><br>${desc}${price ? ' · ' + price : ''}${stock}</div>`;
-    }).join('');
-    LOG.ok('Lookup done');
-  } catch(e) {
-    LOG.err('lookup:', e.message);
-    $('partResult').textContent = 'Error: ' + e.message;
-  }
-});
-
-/* OCR + GEMINI + ROBOFLOW */
-async function loadTesseract() {
-  if (tesseractLoaded) return true;
-  return new Promise((res, rej) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-    s.onload = () => { tesseractLoaded = true; res(true); };
-    s.onerror = () => rej(new Error('Tesseract CDN failed'));
-    document.head.appendChild(s);
-  });
-}
-
-async function runOCR(blobOrImage) {
-  try {
-    await loadTesseract();
-    const result = await Tesseract.recognize(blobOrImage, 'eng', {
-      logger: m => LOG.info('OCR', m.status, Math.round(m.progress * 100) + '%')
-    });
-    const text = result.data.text.trim();
-    LOG.ok('OCR done');
-    showModal('OCR Result', 'Extracted text:', text || '(no text found)');
-    return text;
-  } catch(e) { LOG.err('OCR:', e.message); toast('OCR failed'); return ''; }
-}
-
+const GEMINI_PROMPTS = {
+  identify: 'Identify the electronic component in this microscope image. If it is an IC, read all visible markings and give the part number. Describe package type and pin count.',
+  damage: 'Examine this PCB/component image carefully. Identify any visible damage: burn marks, cold solder joints, corrosion, cracks, missing components, or discoloration. List specific locations.',
+  repair: 'Analyze this electronic component image. Provide step-by-step repair guidance: 1) likely fault 2) tools needed 3) removal procedure 4) replacement 5) testing steps.',
+  full: 'Full analysis of this microscope image of electronics: 1) What is it 2) Visible markings 3) Any damage 4) Repair suggestions 5) Common failure modes 6) Testing procedure. Be technical.'
+};
 async function runGeminiAnalysis(blob) {
-  if (!geminiKey) { toast('Gemini key required'); return; }
-  showModal('AI Analysis', 'Analyzing…');
+  if (!geminiKey) { showModal('Gemini AI', 'API key required. Get free from aistudio.google.com/app/apikey', ''); return; }
+  showModal('Gemini AI', 'Analyzing with Gemini 1.5 Flash…');
   try {
     const b64 = await blobToBase64(blob);
     const body = {
       contents: [{
         parts: [
-          { text: 'You are a mobile repair expert. Identify the PCB/IC in this microscope image. Provide: 1) What it is 2) Visible damage 3) Repair suggestions 4) Common faults. Be technical.' },
+          { text: GEMINI_PROMPTS[geminiPromptPreset] || GEMINI_PROMPTS.identify },
           { inline_data: { mime_type: 'image/jpeg', data: b64 } }
         ]
       }]
     };
     const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body) }
     );
-    if (!r.ok) throw new Error('API ' + r.status);
+    if (!r.ok) { const t = await r.text(); throw new Error('API ' + r.status + ': ' + t.slice(0, 100)); }
     const j = await r.json();
     const text = j.candidates?.[0]?.content?.parts?.[0]?.text || 'No result';
     LOG.ok('Gemini done');
-    showModal('AI Analysis', 'Gemini result:', text);
-    return text;
+    showModal('Gemini AI Result', 'Analysis:', text);
+    const last = capturedPhotos[capturedPhotos.length - 1];
+    if (last) last.aiAnalysis = text;
   } catch(e) {
     LOG.err('Gemini:', e.message);
-    showModal('AI Error', e.message, 'Check key and internet.');
+    showModal('Gemini Error', e.message, 'Check key, internet, quota.');
   }
 }
 
-async function detectPCBDefects(blob) {
-  if (!roboflowKey) { toast('Roboflow key required'); return; }
-  showModal('PCB Defect', 'Analyzing…');
-  try {
-    const b64 = await blobToBase64(blob);
-    const response = await fetch(
-      'https://serverless.roboflow.com/pcb-defect-rjb40/2',
-      { method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded',
-                   'Authorization': `Bearer ${roboflowKey}` },
-        body: b64 }
-    );
-    if (!response.ok) throw new Error('API ' + response.status);
-    const result = await response.json();
-    const preds = (result.predictions || []).map(p =>
-      `${p.class} (${(p.confidence*100).toFixed(1)}%)`).join('\n') || 'No defects found';
-    showModal('PCB Defects', 'Detected:', preds);
-  } catch(e) {
-    LOG.err('Roboflow:', e.message);
-    showModal('Roboflow Error', e.message);
-  }
-}
-
-/* MODAL */
+/* ================= MODAL ================= */
 function showModal(title, desc, result = '') {
   $('modalTitle').textContent = title;
   $('modalDesc').textContent = desc;
@@ -1345,52 +1113,151 @@ function showModal(title, desc, result = '') {
   $('modal').classList.add('on');
 }
 $('modalClose').addEventListener('click', () => $('modal').classList.remove('on'));
-
+$('modalAction').addEventListener('click', () => $('modal').classList.remove('on'));
 $('aiBtn').addEventListener('click', () => {
   const last = capturedPhotos[capturedPhotos.length - 1];
-  if (!last) { toast('Capture a photo first'); return; }
+  if (!last) { toast('Pehle photo lo'); return; }
   $('modalTitle').textContent = 'AI Tools';
-  $('modalDesc').textContent = 'Choose action for last photo:';
+  $('modalDesc').textContent = 'Gemini analyze karo?';
   $('modalResult').classList.add('hidden');
   $('modal').classList.add('on');
-  $('modalAction').textContent = 'Local AI';
-  $('modalAction').onclick = async () => {
+  $('modalAction').textContent = 'Analyze';
+  $('modalAction').onclick = () => {
     $('modal').classList.remove('on');
-    toast('Local AI working…');
-    const result = await identifyComponent(last.blob);
-    if (result) showModal('Component', 'Local AI:', result);
+    runGeminiAnalysis(last.blob);
   };
 });
 
-/* ANNOTATION */
+/* ================= PDF ================= */
+$('pdfBtn').addEventListener('click', async () => {
+  const last = capturedPhotos[capturedPhotos.length - 1];
+  if (!last) { toast('Pehle photo lo'); return; }
+  await generatePDF(last);
+});
+async function generatePDF(photo) {
+  showModal('PDF Report', 'Generating…');
+  try {
+    if (!window.jspdf) {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    doc.setFillColor(10, 10, 10);
+    doc.rect(0, 0, 210, 25, 'F');
+    doc.setTextColor(0, 179, 255);
+    doc.setFontSize(18);
+    doc.text('MicroScope Pro — Repair Report', 105, 15, { align: 'center' });
+    const img = await blobToImage(photo.blob);
+    const c = document.createElement('canvas');
+    const maxW = 1400;
+    const scale = Math.min(1, maxW / img.width);
+    c.width = img.width * scale; c.height = img.height * scale;
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const imgData = c.toDataURL('image/jpeg', 0.92);
+    const imgW = 180;
+    const imgH = (img.height / img.width) * imgW;
+    const maxH = 160;
+    const finalH = Math.min(imgH, maxH);
+    const finalW = (finalH / imgH) * imgW;
+    const x = (210 - finalW) / 2;
+    doc.addImage(imgData, 'JPEG', x, 32, finalW, finalH);
+    let y = 32 + finalH + 10;
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    const dt = new Date(photo.ts).toLocaleString();
+    doc.setFont(undefined, 'bold'); doc.text('Date:', 15, y);
+    doc.setFont(undefined, 'normal'); doc.text(dt, 40, y);
+    y += 7;
+    doc.setFont(undefined, 'bold'); doc.text('Zoom:', 15, y);
+    doc.setFont(undefined, 'normal'); doc.text(currentZoom.toFixed(1) + 'x', 40, y);
+    y += 7;
+    if (mmPerPixel) {
+      doc.setFont(undefined, 'bold'); doc.text('Calibration:', 15, y);
+      doc.setFont(undefined, 'normal'); doc.text(mmPerPixel.toFixed(5) + ' mm/px', 40, y);
+      y += 7;
+    }
+    if (photo.aiAnalysis) {
+      doc.setFont(undefined, 'bold'); doc.text('AI Analysis:', 15, y); y += 6;
+      doc.setFont(undefined, 'normal'); doc.setFontSize(10);
+      const lines = doc.splitTextToSize(photo.aiAnalysis, 180);
+      for (const line of lines) {
+        if (y > 280) { doc.addPage(); y = 15; }
+        doc.text(line, 15, y); y += 5;
+      }
+      y += 5;
+    }
+    if (y > 250) { doc.addPage(); y = 15; }
+    doc.setFont(undefined, 'bold'); doc.setFontSize(11);
+    doc.text('Technician Notes:', 15, y); y += 7;
+    doc.setDrawColor(200, 200, 200);
+    for (let i = 0; i < 6; i++) doc.line(15, y + i * 8, 195, y + i * 8);
+    doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+    doc.text('Generated by MicroScope Pro — ' + new Date().toLocaleString(), 105, 292, { align: 'center' });
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    const ts = new Date(photo.ts).toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.download = 'repair_report_' + ts + '.pdf';
+    a.click();
+    toast('📄 PDF saved');
+    $('modal').classList.remove('on');
+  } catch(e) { LOG.err('PDF:', e.message); showModal('PDF Error', e.message); }
+}
+
+/* ================= REFERENCE OVERLAY ================= */
+let refOpacityCycle = 0.5;
+$('refSetBtn').addEventListener('click', () => {
+  const last = capturedPhotos[capturedPhotos.length - 1];
+  if (!last) { toast('Pehle photo lo'); return; }
+  if (refImageURL === last.url) {
+    refOpacityCycle = refOpacityCycle >= 0.9 ? 0.2 : refOpacityCycle + 0.2;
+    refOverlay.style.opacity = refOpacityCycle;
+    toast('Opacity: ' + Math.round(refOpacityCycle * 100) + '%');
+  } else {
+    refImageURL = last.url;
+    refOverlay.src = refImageURL;
+    refOverlay.classList.add('on');
+    refOverlay.style.opacity = '0.5';
+    refOpacityCycle = 0.5;
+    toast('Reference set');
+  }
+});
+$('refClearBtn').addEventListener('click', () => {
+  refImageURL = null;
+  refOverlay.src = '';
+  refOverlay.classList.remove('on');
+  toast('Reference cleared');
+});
+
+/* ================= ANNOTATION ================= */
 $('annotateBtn').addEventListener('click', () => {
   const last = capturedPhotos[capturedPhotos.length - 1];
   if (!last) { toast('Pehle photo lo'); return; }
   openAnnotator(last);
 });
-
 function openAnnotator(photo) {
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:300;' +
-    'display:flex;flex-direction:column';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#000;z-index:300;display:flex;flex-direction:column';
   overlay.innerHTML = `
-    <div style="padding:10px;display:flex;gap:6px;background:#141414;
-      align-items:center;flex-wrap:wrap">
+    <div style="padding:10px;display:flex;gap:6px;background:#141414;align-items:center;flex-wrap:wrap">
       <button class="chip" data-tool="arrow">➡️ Arrow</button>
       <button class="chip" data-tool="circle">⭕ Circle</button>
       <button class="chip" data-tool="rect">▭ Box</button>
       <button class="chip" data-tool="text">T Text</button>
       <button class="chip" data-tool="undo">↶ Undo</button>
       <button class="chip" data-tool="clear">🗑️ Clear</button>
-      <button class="chip" id="annotateSave" style="margin-left:auto;
-        background:var(--accent);color:#000">💾 Save</button>
+      <button class="chip" id="annotateSave" style="margin-left:auto;background:var(--accent);color:#000">💾 Save</button>
       <button class="chip" id="annotateClose">✕</button>
     </div>
-    <div style="flex:1;display:flex;align-items:center;justify-content:center;
-      overflow:hidden;position:relative">
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden">
       <canvas id="annotateCanvas" style="max-width:100%;max-height:100%"></canvas>
-    </div>
-  `;
+    </div>`;
   document.body.appendChild(overlay);
   const canvas = overlay.querySelector('#annotateCanvas');
   const img = new Image();
@@ -1402,40 +1269,31 @@ function openAnnotator(photo) {
   };
   img.src = photo.url;
 }
-
 function setupAnnotator(canvas, ctx, photo, overlay) {
   let tool = 'arrow', drawing = false, startX = 0, startY = 0, history = [];
   const color = '#00b3ff';
   const lineWidth = Math.max(3, canvas.width / 300);
-
   overlay.querySelectorAll('[data-tool]').forEach(b => {
     b.addEventListener('click', () => {
       const t = b.dataset.tool;
-      if (t === 'undo') {
-        if (history.length) { const last = history.pop(); ctx.putImageData(last, 0, 0); }
-      } else if (t === 'clear') {
+      if (t === 'undo') { if (history.length) ctx.putImageData(history.pop(), 0, 0); }
+      else if (t === 'clear') {
         history = [];
         const img = new Image();
-        img.onload = () => {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0);
-        };
+        img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
         img.src = photo.url;
       } else {
         tool = t;
-        overlay.querySelectorAll('[data-tool]').forEach(x =>
-          x.classList.toggle('active', x === b));
+        overlay.querySelectorAll('[data-tool]').forEach(x => x.classList.toggle('active', x === b));
       }
     });
   });
-
   const getPos = e => {
     const r = canvas.getBoundingClientRect();
     const cx = (e.touches?.[0]?.clientX ?? e.clientX) - r.left;
     const cy = (e.touches?.[0]?.clientY ?? e.clientY) - r.top;
     return { x: cx * (canvas.width / r.width), y: cy * (canvas.height / r.height) };
   };
-
   const start = e => {
     e.preventDefault();
     history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
@@ -1459,8 +1317,16 @@ function setupAnnotator(canvas, ctx, photo, overlay) {
     if (tool === 'arrow' || tool === 'rect') {
       ctx.putImageData(history[history.length - 1], 0, 0);
       ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.lineCap = 'round';
-      if (tool === 'arrow') drawArrow(ctx, startX, startY, p.x, p.y, lineWidth, color);
-      else ctx.strokeRect(startX, startY, p.x - startX, p.y - startY);
+      if (tool === 'arrow') {
+        ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(p.x, p.y); ctx.stroke();
+        const angle = Math.atan2(p.y - startY, p.x - startX);
+        const hl = lineWidth * 4;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - hl * Math.cos(angle - Math.PI/6), p.y - hl * Math.sin(angle - Math.PI/6));
+        ctx.lineTo(p.x - hl * Math.cos(angle + Math.PI/6), p.y - hl * Math.sin(angle + Math.PI/6));
+        ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+      } else ctx.strokeRect(startX, startY, p.x - startX, p.y - startY);
     } else if (tool === 'circle') {
       ctx.putImageData(history[history.length - 1], 0, 0);
       const r = Math.hypot(p.x - startX, p.y - startY);
@@ -1469,14 +1335,12 @@ function setupAnnotator(canvas, ctx, photo, overlay) {
     }
   };
   const end = () => { drawing = false; };
-
   canvas.addEventListener('mousedown', start);
   canvas.addEventListener('mousemove', move);
   canvas.addEventListener('mouseup', end);
   canvas.addEventListener('touchstart', start, { passive: false });
   canvas.addEventListener('touchmove', move, { passive: false });
   canvas.addEventListener('touchend', end);
-
   overlay.querySelector('#annotateSave').addEventListener('click', () => {
     canvas.toBlob(blob => {
       const url = URL.createObjectURL(blob);
@@ -1488,24 +1352,9 @@ function setupAnnotator(canvas, ctx, photo, overlay) {
   overlay.querySelector('#annotateClose').addEventListener('click', () => overlay.remove());
 }
 
-function drawArrow(ctx, x1, y1, x2, y2, lw, color) {
-  const headLen = lw * 4;
-  const angle = Math.atan2(y2 - y1, x2 - x1);
-  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/6),
-             y2 - headLen * Math.sin(angle - Math.PI/6));
-  ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/6),
-             y2 - headLen * Math.sin(angle + Math.PI/6));
-  ctx.closePath(); ctx.fillStyle = color; ctx.fill();
-}
-
-/* VOICE */
+/* ================= VOICE ================= */
 $('voiceNoteBtn').addEventListener('click', async () => {
-  if (voiceRecorder && voiceRecorder.state === 'recording') {
-    voiceRecorder.stop(); return;
-  }
+  if (voiceRecorder && voiceRecorder.state === 'recording') { voiceRecorder.stop(); return; }
   try {
     const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     voiceRecorder = new MediaRecorder(audioStream);
@@ -1517,23 +1366,21 @@ $('voiceNoteBtn').addEventListener('click', async () => {
       const last = capturedPhotos[capturedPhotos.length - 1];
       if (last) last.voiceNote = { url, blob, ts: Date.now() };
       audioStream.getTracks().forEach(t => t.stop());
-      toast('🎤 Voice note saved');
+      toast('🎤 Voice saved');
       $('voiceNoteBtn').classList.remove('active');
       $('voiceNoteBtn').textContent = '🎤 Voice';
     };
     voiceRecorder.start();
     $('voiceNoteBtn').classList.add('active');
     $('voiceNoteBtn').textContent = '⏹ Stop';
-    toast('Recording voice…');
   } catch(e) { toast('Mic error: ' + e.message); }
 });
 
-/* VIDEO RECORD */
+/* ================= RECORD ================= */
 $('recordBtn').addEventListener('click', () => {
   if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
   else startRecording();
 });
-
 function startRecording() {
   if (!stream) return;
   recordedChunks = [];
@@ -1559,76 +1406,43 @@ function startRecording() {
   recStartTime = Date.now();
   recTimer = setInterval(() => {
     const s = Math.floor((Date.now() - recStartTime) / 1000);
-    $('recTime').textContent =
-      String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    $('recTime').textContent = String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
   }, 500);
 }
-
 function stopRecording() {
   if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
 }
 
-/* GALLERY */
+/* ================= GALLERY ================= */
 $('galleryBtn').addEventListener('click', () => {
   if (!capturedPhotos.length) return toast('No photos yet');
   capturedPhotos.forEach((p, i) => setTimeout(() => downloadPhoto(p), i * 200));
   toast('Downloading ' + capturedPhotos.length + ' files…');
 });
-
 function downloadPhoto(p) {
   const a = document.createElement('a');
   a.href = p.url;
   const ts = new Date(p.ts).toISOString().slice(0,19).replace(/[:T]/g,'-');
   a.download = 'microscope_' + ts + (p.isVideo ? '.webm' : '.jpg');
   a.click();
-  if (p.voiceNote) {
-    setTimeout(() => {
-      const a2 = document.createElement('a');
-      a2.href = p.voiceNote.url;
-      a2.download = 'microscope_' + ts + '_voice.webm';
-      a2.click();
-    }, 300);
-  }
 }
 
-/* SETTINGS */
+/* ================= SETTINGS ================= */
 $('settingsBtn').addEventListener('click', () => settingsPanel.classList.add('open'));
 $('closeSettings').addEventListener('click', () => settingsPanel.classList.remove('open'));
-
 $('resSelect').addEventListener('change', () => { saveSettings(); startCamera(); });
 $('facingSelect').addEventListener('change', () => { saveSettings(); startCamera(); });
 $('micTgl').addEventListener('click', () => {
-  wantAudio = !wantAudio;
-  $('micTgl').classList.toggle('on', wantAudio);
-  saveSettings(); startCamera();
+  wantAudio = !wantAudio; $('micTgl').classList.toggle('on', wantAudio); saveSettings(); startCamera();
 });
-$('fullResTgl').addEventListener('click', () => {
-  useFullRes = !useFullRes;
-  $('fullResTgl').classList.toggle('on', useFullRes);
-  saveSettings(); startCamera();
-});
-
 const reapply = () => applyVisualTransforms(currentDigitalScale);
 $('brightRange').addEventListener('input', e => { vs.bright = +e.target.value; reapply(); saveSettings(); });
 $('contrastRange').addEventListener('input', e => { vs.contrast = +e.target.value; reapply(); saveSettings(); });
 $('satRange').addEventListener('input', e => { vs.sat = +e.target.value; reapply(); saveSettings(); });
 $('sharpRange').addEventListener('input', e => { vs.sharp = +e.target.value; reapply(); saveSettings(); });
-$('mirrorHTgl').addEventListener('click', () => {
-  vs.mirrorH = !vs.mirrorH;
-  $('mirrorHTgl').classList.toggle('on', vs.mirrorH);
-  reapply(); saveSettings();
-});
-$('mirrorVTgl').addEventListener('click', () => {
-  vs.mirrorV = !vs.mirrorV;
-  $('mirrorVTgl').classList.toggle('on', vs.mirrorV);
-  reapply(); saveSettings();
-});
-$('rotate180Tgl').addEventListener('click', () => {
-  vs.rotate180 = !vs.rotate180;
-  $('rotate180Tgl').classList.toggle('on', vs.rotate180);
-  reapply(); saveSettings();
-});
-
+$('mirrorHTgl').addEventListener('click', () => { vs.mirrorH = !vs.mirrorH; $('mirrorHTgl').classList.toggle('on', vs.mirrorH); reapply(); saveSettings(); });
+$('mirrorVTgl').addEventListener('click', () => { vs.mirrorV = !vs.mirrorV; $('mirrorVTgl').classList.toggle('on', vs.mirrorV); reapply(); saveSettings(); });
+$('rotate180Tgl').addEventListener('click', () => { vs.rotate180 = !vs.rotate180; $('rotate180Tgl').classList.toggle('on', vs.rotate180); reapply(); saveSettings(); });
 $('wbAutoTgl').addEventListener('click', async () => {
   const on = !$('wbAutoTgl').classList.contains('on');
   $('wbAutoTgl').classList.toggle('on', on);
@@ -1643,70 +1457,138 @@ $('wbRange').addEventListener('input', async e => {
   $('wbAutoTgl').classList.remove('on');
   $('wbMode').textContent = v + 'K';
 });
-
-$('autoAfTgl').addEventListener('click', () => {
-  autoAfAfter3s = !autoAfAfter3s;
-  $('autoAfTgl').classList.toggle('on', autoAfAfter3s); saveSettings();
-});
-$('tapFocusTgl').addEventListener('click', () => {
-  tapFocusEnabled = !tapFocusEnabled;
-  $('tapFocusTgl').classList.toggle('on', tapFocusEnabled); saveSettings();
-});
+$('autoAfTgl').addEventListener('click', () => { autoAfAfter3s = !autoAfAfter3s; $('autoAfTgl').classList.toggle('on', autoAfAfter3s); saveSettings(); });
+$('tapFocusTgl').addEventListener('click', () => { tapFocusEnabled = !tapFocusEnabled; $('tapFocusTgl').classList.toggle('on', tapFocusEnabled); saveSettings(); });
 $('afAssistTgl').addEventListener('click', async () => {
-  afAssistOn = !afAssistOn;
-  $('afAssistTgl').classList.toggle('on', afAssistOn);
+  afAssistOn = !afAssistOn; $('afAssistTgl').classList.toggle('on', afAssistOn);
   if (caps.torch) await safeApply({ advanced: [{ torch: afAssistOn }] }, 'afAssist');
   saveSettings();
 });
-
-$('zoomSpeedRange').addEventListener('input', e => {
-  zoomLerp = +e.target.value / 100; saveSettings();
-});
+$('zoomSpeedRange').addEventListener('input', e => { zoomLerp = +e.target.value / 100; saveSettings(); });
 $('maxZoomSelect').addEventListener('change', e => {
   maxZoomTotal = +e.target.value;
   zoomSlider.max = maxZoomTotal;
-  setTargetZoom(Math.min(currentZoom, maxZoomTotal));
-  saveSettings(); updatePmButtons();
+  setTargetZoom(Math.min(currentZoom, maxZoomTotal)); saveSettings(); updatePmButtons();
 });
-$('zoomStepRange').addEventListener('input', e => {
-  zoomStep = +e.target.value; saveSettings();
-});
-
-$('geminiKey').addEventListener('input', e => {
-  geminiKey = e.target.value.trim(); saveSettings();
-});
-$('roboflowKey').addEventListener('input', e => {
-  roboflowKey = e.target.value.trim(); saveSettings();
-});
-$('autoOcrTgl').addEventListener('click', () => {
-  autoOcr = !autoOcr;
-  $('autoOcrTgl').classList.toggle('on', autoOcr); saveSettings();
-});
-$('autoAnalyzeTgl').addEventListener('click', () => {
-  autoAnalyze = !autoAnalyze;
-  $('autoAnalyzeTgl').classList.toggle('on', autoAnalyze); saveSettings();
+$('zoomStepRange').addEventListener('input', e => { zoomStep = +e.target.value; saveSettings(); });
+$('upscaleBtn').addEventListener('click', async () => {
+  const last = capturedPhotos[capturedPhotos.length - 1];
+  if (!last) { toast('Pehle photo lo'); return; }
+  try {
+    const img = await blobToImage(last.blob);
+    const c = document.createElement('canvas');
+    c.width = img.width * 2; c.height = img.height * 2;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const outBlob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.95));
+    capturedPhotos.push({ url: URL.createObjectURL(outBlob), blob: outBlob, ts: Date.now(), note: 'upscaled' });
+    toast('2x upscale saved');
+  } catch(e) { LOG.err('upscale:', e.message); }
 });
 
+/* MEASURE */
+$('mmPerPixel').addEventListener('input', e => {
+  const v = parseFloat(e.target.value); mmPerPixel = isNaN(v) ? null : v; saveSettings();
+});
+$('rulerTgl').addEventListener('click', () => {
+  const on = !$('rulerTgl').classList.contains('on');
+  $('rulerTgl').classList.toggle('on', on);
+  if (on) enableMeasure(); else disableMeasure();
+});
+$('calibrateBtn').addEventListener('click', () => {
+  toast('Tap 2 points (e.g. 0402 = 1.0mm)');
+  calibrationMode = true; enableMeasure();
+});
+$('clearMeasureBtn').addEventListener('click', () => {
+  measurePoints = []; if (measureOverlay) measureOverlay.innerHTML = '';
+});
+function enableMeasure() {
+  if (!freezeCanvas.classList.contains('on')) { toast('Pehle freeze karo'); return; }
+  if (!measureOverlay) {
+    measureOverlay = document.createElement('div');
+    measureOverlay.style.cssText = 'position:absolute;inset:0;z-index:10;pointer-events:none';
+    freezeCanvas.parentElement.appendChild(measureOverlay);
+  }
+  measureActive = true;
+  stage.addEventListener('click', handleMeasureClick);
+}
+function disableMeasure() {
+  measureActive = false;
+  stage.removeEventListener('click', handleMeasureClick);
+}
+function handleMeasureClick(e) {
+  if (!measureActive) return;
+  const rect = freezeCanvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  measurePoints.push({ x, y });
+  const dot = document.createElement('div');
+  dot.style.cssText = `position:absolute;left:${x*100}%;top:${y*100}%;width:10px;height:10px;background:var(--accent);border:2px solid #fff;border-radius:50%;transform:translate(-50%,-50%)`;
+  measureOverlay.appendChild(dot);
+  if (measurePoints.length === 2) {
+    const p1 = measurePoints[0], p2 = measurePoints[1];
+    const pixDist = Math.hypot((p2.x - p1.x) * freezeCanvas.width, (p2.y - p1.y) * freezeCanvas.height);
+    let label = `${pixDist.toFixed(0)} px`;
+    if (calibrationMode) {
+      const knownMM = prompt('Real size in mm?', '1.0');
+      if (knownMM) {
+        mmPerPixel = parseFloat(knownMM) / pixDist;
+        $('mmPerPixel').value = mmPerPixel.toFixed(5);
+        toast('Calibrated'); saveSettings();
+      }
+      calibrationMode = false;
+    } else if (mmPerPixel) label = `${(pixDist * mmPerPixel).toFixed(3)} mm`;
+    const line = document.createElement('div');
+    const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
+    const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) * 100;
+    line.style.cssText = `position:absolute;left:${p1.x*100}%;top:${p1.y*100}%;width:${len}%;height:2px;background:var(--accent);transform-origin:0 0;transform:rotate(${angle}deg)`;
+    measureOverlay.appendChild(line);
+    const labelEl = document.createElement('div');
+    labelEl.textContent = label;
+    labelEl.style.cssText = `position:absolute;left:${(p1.x+p2.x)/2*100}%;top:${(p1.y+p2.y)/2*100}%;background:rgba(0,0,0,.8);color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;transform:translate(-50%,-50%);pointer-events:none`;
+    measureOverlay.appendChild(labelEl);
+    measurePoints = [];
+  }
+}
+
+/* LOOKUP */
+$('lookupBtn').addEventListener('click', async () => {
+  const part = $('partInput').value.trim();
+  if (!part) { toast('Part number likho'); return; }
+  $('partResult').textContent = 'Searching…';
+  try {
+    const r = await fetch(`https://jlcsearch.tscircuit.com/api/search?q=${encodeURIComponent(part)}&limit=5`);
+    if (!r.ok) throw new Error('API ' + r.status);
+    const data = await r.json();
+    const items = data.components || data.results || [];
+    if (!items.length) { $('partResult').textContent = 'Kuch nahi mila'; return; }
+    $('partResult').innerHTML = items.slice(0,5).map(c => {
+      const desc = c.description || c.mfr || 'No description';
+      return `<div style="margin-bottom:6px;padding:6px;background:#1a1a1a;border-radius:6px"><b style="color:var(--accent)">${c.mfr_part || c.lcsc || part}</b><br>${desc}</div>`;
+    }).join('');
+  } catch(e) { $('partResult').textContent = 'Error: ' + e.message; }
+});
+
+/* HEALTH */
 $('clearLogs').addEventListener('click', () => LOG.clear());
 $('runHealth').addEventListener('click', runHealthCheck);
-
 async function runHealthCheck() {
-  LOG.info('--- Health Check ---');
+  LOG.info('--- Health ---');
   LOG.info('HTTPS:', location.protocol === 'https:' ? 'yes' : 'no');
   LOG.info('SW:', 'serviceWorker' in navigator ? 'yes' : 'no');
-  LOG.info('MediaDevices:', !!navigator.mediaDevices);
-  LOG.info('ImageCapture:', 'ImageCapture' in window);
-  LOG.info('MediaRecorder:', 'MediaRecorder' in window);
   LOG.info('Stream:', !!stream);
   LOG.info('Track:', videoTrack?.readyState);
   LOG.info('Caps:', Object.keys(caps).join(','));
+  LOG.info('Vibrate:', !!navigator.vibrate);
+  LOG.info('Battery:', 'getBattery' in navigator ? 'yes' : 'no');
+  LOG.info('DeviceMotion:', 'DeviceMotionEvent' in window ? 'yes' : 'no');
+  LOG.info('DeviceOrientation:', 'DeviceOrientationEvent' in window ? 'yes' : 'no');
+  LOG.info('SpeechSynthesis:', 'speechSynthesis' in window ? 'yes' : 'no');
   if (navigator.storage?.estimate) {
     const est = await navigator.storage.estimate();
-    LOG.info('Storage:', Math.round(est.usage/1024/1024) + 'MB / ' +
-      Math.round(est.quota/1024/1024) + 'MB');
+    LOG.info('Storage:', Math.round(est.usage/1024/1024) + 'MB / ' + Math.round(est.quota/1024/1024) + 'MB');
   }
-  const regs = await navigator.serviceWorker?.getRegistrations?.() || [];
-  LOG.info('SW regs:', regs.length);
   LOG.ok('Done');
 }
 
@@ -1721,27 +1603,26 @@ $('fsBtn').addEventListener('click', async () => {
 /* PERSIST */
 function saveSettings() {
   try {
-    localStorage.setItem('msp_settings_v5', JSON.stringify({
+    localStorage.setItem('msp_v5', JSON.stringify({
       res: $('resSelect').value, facing: $('facingSelect').value,
-      mic: wantAudio, fullRes: useFullRes, vs: { ...vs },
+      mic: wantAudio, vs: { ...vs },
       maxZoomTotal, zoomSpeed: $('zoomSpeedRange').value, zoomStep,
       grid: gridEl.classList.contains('on'),
+      crosshair: crossEl.classList.contains('on'),
+      safe: safeEl.classList.contains('on'),
       autoAfAfter3s, tapFocusEnabled, afAssistOn,
-      geminiKey, roboflowKey, autoOcr, autoAnalyze,
-      localAI: autoLocalAI, mmPerPixel, upscaleEngine
+      geminiKey, geminiPromptPreset, mmPerPixel
     }));
   } catch(e){}
 }
-
 function loadSettings() {
   try {
-    const raw = localStorage.getItem('msp_settings_v5');
+    const raw = localStorage.getItem('msp_v5');
     if (!raw) return;
     const s = JSON.parse(raw);
     if (s.res) $('resSelect').value = s.res;
     if (s.facing) $('facingSelect').value = s.facing;
     if (s.mic) { wantAudio = true; $('micTgl').classList.add('on'); }
-    if (s.fullRes) { useFullRes = true; $('fullResTgl').classList.add('on'); }
     if (s.vs) {
       vs = { ...vs, ...s.vs };
       $('brightRange').value = vs.bright; $('contrastRange').value = vs.contrast;
@@ -1754,113 +1635,30 @@ function loadSettings() {
     if (s.zoomSpeed) { $('zoomSpeedRange').value = s.zoomSpeed; zoomLerp = s.zoomSpeed / 100; }
     if (s.zoomStep) { $('zoomStepRange').value = s.zoomStep; zoomStep = s.zoomStep; }
     if (s.grid) { gridEl.classList.add('on'); $('gridBtn').classList.add('active'); }
-    if (typeof s.autoAfAfter3s === 'boolean') {
-      autoAfAfter3s = s.autoAfAfter3s;
-      $('autoAfTgl').classList.toggle('on', autoAfAfter3s);
-    }
-    if (typeof s.tapFocusEnabled === 'boolean') {
-      tapFocusEnabled = s.tapFocusEnabled;
-      $('tapFocusTgl').classList.toggle('on', tapFocusEnabled);
-    }
-    if (typeof s.afAssistOn === 'boolean') {
-      afAssistOn = s.afAssistOn;
-      $('afAssistTgl').classList.toggle('on', afAssistOn);
-    }
+    if (s.crosshair) { crossEl.classList.add('on'); $('crosshairBtn').classList.add('active'); }
+    if (s.safe) { safeEl.classList.add('on'); $('safeZoneBtn').classList.add('active'); }
+    if (typeof s.autoAfAfter3s === 'boolean') { autoAfAfter3s = s.autoAfAfter3s; $('autoAfTgl').classList.toggle('on', autoAfAfter3s); }
+    if (typeof s.tapFocusEnabled === 'boolean') { tapFocusEnabled = s.tapFocusEnabled; $('tapFocusTgl').classList.toggle('on', tapFocusEnabled); }
+    if (typeof s.afAssistOn === 'boolean') { afAssistOn = s.afAssistOn; $('afAssistTgl').classList.toggle('on', afAssistOn); }
     if (s.geminiKey) { geminiKey = s.geminiKey; $('geminiKey').value = geminiKey; }
-    if (s.roboflowKey) { roboflowKey = s.roboflowKey; $('roboflowKey').value = roboflowKey; }
-    if (s.autoOcr) { autoOcr = true; $('autoOcrTgl').classList.add('on'); }
-    if (s.autoAnalyze) { autoAnalyze = true; $('autoAnalyzeTgl').classList.add('on'); }
-    if (s.localAI) { autoLocalAI = true; $('autoLocalAITgl').classList.add('on'); }
+    if (s.geminiPromptPreset) { geminiPromptPreset = s.geminiPromptPreset; $('geminiPrompt').value = s.geminiPromptPreset; }
     if (s.mmPerPixel) { mmPerPixel = s.mmPerPixel; $('mmPerPixel').value = s.mmPerPixel; }
-    if (s.upscaleEngine) { upscaleEngine = s.upscaleEngine; $('upscaleEngine').value = s.upscaleEngine; }
   } catch(e){}
 }
 
-/* PWA */
+/* ================= SERVICE WORKER ================= */
 let swRegistration = null, waitingWorker = null;
-
-(function setupPWA() {
-  const manifest = {
-    name: 'MicroScope Pro 100x — Industrial',
-    short_name: 'MicroScope', start_url: '.', scope: '.',
-    display: 'standalone', orientation: 'any',
-    theme_color: '#0a0a0a', background_color: '#0a0a0a',
-    description: 'Industrial microscope PWA for mobile repairing',
-    categories: ['utilities', 'productivity'],
-    icons: [{
-      src: 'data:image/svg+xml,' + encodeURIComponent(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">' +
-        '<rect width="512" height="512" rx="80" fill="#00b3ff"/>' +
-        '<circle cx="256" cy="256" r="140" fill="none" stroke="#fff" stroke-width="24"/>' +
-        '<circle cx="256" cy="256" r="50" fill="#fff"/></svg>'
-      ),
-      sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable'
-    }]
-  };
-  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-  const link = document.createElement('link');
-  link.rel = 'manifest';
-  link.href = URL.createObjectURL(blob);
-  document.head.appendChild(link);
-
-  if (!('serviceWorker' in navigator)) {
-    LOG.warn('SW not supported');
-    if ($('offlineStatus')) $('offlineStatus').textContent = 'unsupported';
-    return;
-  }
-
-  const swCode = `
-    const VERSION='v5.0.0';
-    const CACHE='microscope-'+VERSION;
-    const APP_SHELL=['./'];
-    self.addEventListener('install',e=>{self.skipWaiting();
-      e.waitUntil(caches.open(CACHE).then(c=>c.addAll(APP_SHELL)));});
-    self.addEventListener('activate',e=>{
-      e.waitUntil(caches.keys().then(keys=>Promise.all(
-        keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))
-      )).then(()=>self.clients.claim()));});
-    self.addEventListener('message',e=>{
-      if(e.data==='SKIP_WAITING')self.skipWaiting();});
-    self.addEventListener('fetch',e=>{
-      const req=e.request;
-      if(req.method!=='GET')return;
-      const url=new URL(req.url);
-      if(url.hostname.includes('generativelanguage')||
-         url.hostname.includes('roboflow')||
-         url.hostname.includes('jlcsearch')||
-         url.hostname.includes('api.'))return;
-      if(url.hostname.includes('cdn.')||url.hostname.includes('unpkg')||
-         url.hostname.includes('jsdelivr')||url.hostname.includes('huggingface')){
-        e.respondWith(caches.open(CACHE).then(async c=>{
-          const cached=await c.match(req);
-          const fetchP=fetch(req).then(resp=>{
-            if(resp.ok)c.put(req,resp.clone()); return resp;
-          }).catch(()=>cached);
-          return cached||fetchP;
-        }));return;
-      }
-      e.respondWith(caches.match(req).then(cached=>{
-        if(cached)return cached;
-        return fetch(req).then(resp=>{
-          if(resp.ok&&url.origin===location.origin){
-            const copy=resp.clone();
-            caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{});
-          } return resp;
-        }).catch(()=>caches.match('./'));
-      }));
-    });
-  `;
-  const swBlob = new Blob([swCode], { type: 'application/javascript' });
-  navigator.serviceWorker.register(URL.createObjectURL(swBlob), { scope: './' })
-    .then(reg => {
-      swRegistration = reg;
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      swRegistration = await navigator.serviceWorker.register('./sw.js', { scope: './' });
       LOG.ok('SW registered');
-      if ($('offlineStatus')) {
-        $('offlineStatus').textContent = 'ready ✓';
-        $('offlineStatus').style.color = 'var(--ok)';
-      }
-      reg.addEventListener('updatefound', () => {
-        const nw = reg.installing;
+      $('pwaStatus').textContent = 'OK';
+      $('pwaStatus').classList.add('ok');
+      $('offlineStatus').textContent = 'ready ✓';
+      $('offlineStatus').style.color = 'var(--ok)';
+      swRegistration.addEventListener('updatefound', () => {
+        const nw = swRegistration.installing;
         if (!nw) return;
         nw.addEventListener('statechange', () => {
           if (nw.state === 'installed' && navigator.serviceWorker.controller) {
@@ -1869,25 +1667,25 @@ let swRegistration = null, waitingWorker = null;
           }
         });
       });
-    })
-    .catch(e => {
+    } catch(e) {
       LOG.err('SW:', e.message);
-      if ($('offlineStatus')) {
-        $('offlineStatus').textContent = 'error';
-        $('offlineStatus').style.color = 'var(--danger)';
-      }
-    });
-
+      $('pwaStatus').textContent = 'ERR';
+      $('offlineStatus').textContent = 'error';
+      $('offlineStatus').style.color = 'var(--danger)';
+    }
+  });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!window.__refreshing) { window.__refreshing = true; location.reload(); }
   });
-})();
-
+} else {
+  $('pwaStatus').textContent = 'N/A';
+  $('offlineStatus').textContent = 'unsupported';
+}
 $('updateBanner').addEventListener('click', () => {
   if (waitingWorker) waitingWorker.postMessage('SKIP_WAITING');
 });
 $('checkUpdate').addEventListener('click', async () => {
-  if (swRegistration) { await swRegistration.update(); toast('Checked for updates'); }
+  if (swRegistration) { await swRegistration.update(); toast('Checked'); }
 });
 $('reinstallSW').addEventListener('click', async () => {
   const regs = await navigator.serviceWorker.getRegistrations();
@@ -1896,34 +1694,656 @@ $('reinstallSW').addEventListener('click', async () => {
     const keys = await caches.keys();
     for (const k of keys) await caches.delete(k);
   }
-  toast('SW reset — reload to reinstall');
+  toast('SW reset — reload');
 });
 
-/* INIT */
+/* ================= TEST MODE ================= */
+const TEST_TOOLS = [
+  { id: 'screen', icon: '🖥️', name: 'Screen Test', desc: 'Dead pixel, backlight, color' },
+  { id: 'speaker', icon: '🔊', name: 'Speaker Test', desc: 'Tone generator, L/R channel' },
+  { id: 'mic', icon: '🎤', name: 'Mic Test', desc: 'Decibel meter, live level' },
+  { id: 'vibration', icon: '📳', name: 'Vibration', desc: 'Motor strength test' },
+  { id: 'magnet', icon: '🧲', name: 'Magnetometer', desc: 'Magnetic sensor check' },
+  { id: 'battery', icon: '🔋', name: 'Battery', desc: 'Health, level, charging' },
+  { id: 'level', icon: '⚖️', name: 'Level / Tilt', desc: 'Board alignment check' },
+  { id: 'light', icon: '💡', name: 'Light Meter', desc: 'Ambient brightness measure' },
+  { id: 'touch', icon: '👆', name: 'Touch Test', desc: 'Multi-touch, dead zones' },
+  { id: 'gyro', icon: '📱', name: 'Gyroscope', desc: 'Motion, shake, rotation' },
+  { id: 'network', icon: '📶', name: 'Network', desc: 'Online, speed, type' },
+  { id: 'audio-output', icon: '🎧', name: 'Ear Speaker', desc: 'Earpiece test tone' }
+];
+
+$('testBtn').addEventListener('click', () => {
+  $('testPanel').classList.add('on');
+  renderTestGrid();
+});
+$('testBack').addEventListener('click', () => {
+  if ($('testContent').querySelector('.testView')) {
+    renderTestGrid();
+  } else {
+    $('testPanel').classList.remove('on');
+  }
+});
+
+function renderTestGrid() {
+  $('testTitle').textContent = '🧪 Hardware Test Suite';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <p>Apne phone ka hardware test karo. Har tool asli mobile repairing ka kaam karta hai.</p>
+    </div>
+    <div class="testGrid" style="margin-top:12px">
+      ${TEST_TOOLS.map(t => `
+        <div class="testCard" data-test="${t.id}">
+          <div class="icon">${t.icon}</div>
+          <div class="name">${t.name}</div>
+          <div class="desc">${t.desc}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  $('testContent').querySelectorAll('.testCard').forEach(c => {
+    c.addEventListener('click', () => runTest(c.dataset.test));
+  });
+}
+
+function runTest(id) {
+  switch(id) {
+    case 'screen': testScreen(); break;
+    case 'speaker': testSpeaker(); break;
+    case 'mic': testMic(); break;
+    case 'vibration': testVibration(); break;
+    case 'magnet': testMagnet(); break;
+    case 'battery': testBattery(); break;
+    case 'level': testLevel(); break;
+    case 'light': testLight(); break;
+    case 'touch': testTouch(); break;
+    case 'gyro': testGyro(); break;
+    case 'network': testNetwork(); break;
+    case 'audio-output': testEarSpeaker(); break;
+  }
+}
+
+/* ---- SCREEN TEST ---- */
+const SCREEN_COLORS = [
+  { c: '#ff0000', n: 'Red' }, { c: '#00ff00', n: 'Green' },
+  { c: '#0000ff', n: 'Blue' }, { c: '#ffffff', n: 'White' },
+  { c: '#000000', n: 'Black' }, { c: '#808080', n: 'Gray' },
+  { c: '#ffff00', n: 'Yellow' }, { c: '#00ffff', n: 'Cyan' },
+  { c: '#ff00ff', n: 'Magenta' }
+];
+let screenIdx = 0;
+function testScreen() {
+  screenIdx = 0;
+  const ov = $('screenTestOverlay');
+  ov.classList.add('on');
+  ov.style.background = SCREEN_COLORS[0].c;
+  $('screenTestLabel').textContent = SCREEN_COLORS[0].n + ' — Tap to change, double-tap to exit';
+  ov.onclick = () => {
+    screenIdx++;
+    if (screenIdx >= SCREEN_COLORS.length) { ov.classList.remove('on'); return; }
+    ov.style.background = SCREEN_COLORS[screenIdx].c;
+    $('screenTestLabel').textContent = SCREEN_COLORS[screenIdx].n + ' — Tap to change';
+  };
+  ov.ondblclick = () => ov.classList.remove('on');
+}
+
+/* ---- SPEAKER TEST ---- */
+let speakerCtx = null, speakerOsc = null, speakerGain = null;
+function testSpeaker() {
+  $('testTitle').textContent = '🔊 Speaker Test';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Speaker / Tone Generator</h2>
+      <p>Play tones to test speaker. Listen for distortion, buzz, or silence.</p>
+      <div class="bigVal" id="spkFreq">1000 Hz</div>
+      <div class="bigLabel">Frequency</div>
+      <input type="range" id="spkFreqRange" min="50" max="15000" step="10" value="1000" style="width:100%;margin:12px 0">
+      <div class="row"><label>Channel</label>
+        <select id="spkChannel">
+          <option value="both">Both</option>
+          <option value="left">Left only</option>
+          <option value="right">Right only</option>
+        </select></div>
+      <div class="testActions">
+        <button id="spkPlay" class="primary">▶ Play</button>
+        <button id="spkStop">⏹ Stop</button>
+      </div>
+      <p style="margin-top:12px;font-size:11px">
+        Tip: 1000 Hz normal hai. 50-200 Hz bass test. 5000-15000 Hz treble test.
+      </p>
+    </div>
+  `;
+  const range = $('spkFreqRange');
+  range.addEventListener('input', () => {
+    const f = parseInt(range.value);
+    $('spkFreq').textContent = f + ' Hz';
+    if (speakerOsc) speakerOsc.frequency.setValueAtTime(f, speakerCtx.currentTime);
+  });
+  $('spkPlay').addEventListener('click', () => startTone(parseInt(range.value), $('spkChannel').value));
+  $('spkStop').addEventListener('click', stopTone);
+}
+function startTone(freq, channel) {
+  stopTone();
+  speakerCtx = new (window.AudioContext || window.webkitAudioContext)();
+  speakerOsc = speakerCtx.createOscillator();
+  speakerGain = speakerCtx.createGain();
+  speakerOsc.type = 'sine';
+  speakerOsc.frequency.value = freq;
+  speakerGain.gain.value = 0.15;
+  let pan = 0;
+  if (channel === 'left') pan = -1;
+  if (channel === 'right') pan = 1;
+  if (speakerCtx.createStereoPanner) {
+    const panner = speakerCtx.createStereoPanner();
+    panner.pan.value = pan;
+    speakerOsc.connect(speakerGain).connect(panner).connect(speakerCtx.destination);
+  } else {
+    speakerOsc.connect(speakerGain).connect(speakerCtx.destination);
+  }
+  speakerOsc.start();
+}
+function stopTone() {
+  if (speakerOsc) { try { speakerOsc.stop(); } catch(e){} speakerOsc = null; }
+  if (speakerCtx) { try { speakerCtx.close(); } catch(e){} speakerCtx = null; }
+}
+
+/* ---- MIC TEST ---- */
+let micStream = null, micAnalyser = null, micRAF = null;
+async function testMic() {
+  $('testTitle').textContent = '🎤 Mic Test';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Microphone Live Level</h2>
+      <p>Bolo ya tap karo mic ke paas. Level bar upar-neeche ho to mic sahi hai.</p>
+      <div class="bigVal" id="micDB">-- dB</div>
+      <div class="bigLabel">Current level</div>
+      <div style="width:100%;height:20px;background:#222;border-radius:10px;overflow:hidden;margin:12px 0">
+        <div id="micBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--ok),var(--warn),var(--danger));transition:width .05s"></div>
+      </div>
+      <div class="metric"><span>Peak</span><span class="val" id="micPeak">-- dB</span></div>
+      <div class="testActions">
+        <button id="micStart" class="primary">▶ Start</button>
+        <button id="micStop">⏹ Stop</button>
+      </div>
+    </div>
+  `;
+  $('micStart').addEventListener('click', startMicTest);
+  $('micStop').addEventListener('click', stopMicTest);
+}
+async function startMicTest() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(micStream);
+    micAnalyser = ctx.createAnalyser();
+    micAnalyser.fftSize = 2048;
+    src.connect(micAnalyser);
+    const buf = new Uint8Array(micAnalyser.frequencyBinCount);
+    let peak = 0;
+    const tick = () => {
+      if (!micAnalyser) return;
+      micAnalyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / buf.length);
+      const db = 20 * Math.log10(rms + 1e-6);
+      const dbDisplay = Math.max(0, Math.round(db + 100));
+      if (dbDisplay > peak) peak = dbDisplay;
+      $('micDB').textContent = dbDisplay + ' dB';
+      $('micBar').style.width = Math.min(100, dbDisplay) + '%';
+      $('micPeak').textContent = peak + ' dB';
+      micRAF = requestAnimationFrame(tick);
+    };
+    tick();
+  } catch(e) { toast('Mic error: ' + e.message); }
+}
+function stopMicTest() {
+  if (micRAF) cancelAnimationFrame(micRAF);
+  micRAF = null;
+  micAnalyser = null;
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+}
+
+/* ---- VIBRATION TEST ---- */
+function testVibration() {
+  $('testTitle').textContent = '📳 Vibration Test';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Vibration Motor</h2>
+      <p>Phone haath mein pakro aur pattern choose karo. Motor buzz feel hona chahiye.</p>
+      <div class="vibrateGrid">
+        <button data-vib="short">Short (100ms)</button>
+        <button data-vib="long">Long (1000ms)</button>
+        <button data-vib="double">Double tap</button>
+        <button data-vib="triple">Triple</button>
+        <button data-vib="sos">SOS pattern</button>
+        <button data-vib="heart">Heartbeat</button>
+      </div>
+      <p id="vibStatus" style="margin-top:12px">Vibration API: ${'vibrate' in navigator ? 'supported' : 'NOT SUPPORTED'}</p>
+    </div>
+  `;
+  $('testContent').querySelectorAll('[data-vib]').forEach(b => {
+    b.addEventListener('click', () => {
+      const pattern = b.dataset.vib;
+      if (!('vibrate' in navigator)) { toast('Vibration not supported'); return; }
+      if (pattern === 'short') navigator.vibrate(100);
+      else if (pattern === 'long') navigator.vibrate(1000);
+      else if (pattern === 'double') navigator.vibrate([100, 100, 100]);
+      else if (pattern === 'triple') navigator.vibrate([100, 80, 100, 80, 100]);
+      else if (pattern === 'sos') navigator.vibrate([100, 100, 100, 200, 300, 200, 300, 200, 100, 100, 100]);
+      else if (pattern === 'heart') navigator.vibrate([80, 60, 80, 500, 80, 60, 80]);
+    });
+  });
+}
+
+/* ---- MAGNET TEST ---- */
+let magnetHandler = null;
+function testMagnet() {
+  $('testTitle').textContent = '🧲 Magnetometer';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Magnetic Field Sensor</h2>
+      <p>Phone ko magnet ke paas lao. Values change honi chahiye. Zyada field = speaker ya motor ke paas.</p>
+      <div class="bigVal" id="magVal">--</div>
+      <div class="bigLabel">Total field (µT)</div>
+      <div class="metric"><span>X</span><span class="val" id="magX">--</span></div>
+      <div class="metric"><span>Y</span><span class="val" id="magY">--</span></div>
+      <div class="metric"><span>Z</span><span class="val" id="magZ">--</span></div>
+      <div class="metric"><span>Status</span><span class="val" id="magStatus">--</span></div>
+      <canvas class="magnetCanvas" id="magCanvas"></canvas>
+      <div class="testActions">
+        <button id="magStart" class="primary">▶ Start</button>
+        <button id="magStop">⏹ Stop</button>
+      </div>
+      <p style="margin-top:12px;font-size:11px">
+        Normal: 25-65 µT. 100+ µT = magnet paas hai. 0 = sensor issue.
+      </p>
+    </div>
+  `;
+  $('magStart').addEventListener('click', startMagnet);
+  $('magStop').addEventListener('click', stopMagnet);
+}
+function startMagnet() {
+  if (!('DeviceOrientationEvent' in window)) {
+    toast('Magnetometer not supported');
+    return;
+  }
+  const canvas = $('magCanvas');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth * 2;
+  canvas.height = canvas.offsetHeight * 2;
+  const ctx = canvas.getContext('2d');
+  const history = [];
+  magnetHandler = (e) => {
+    // Some devices only give alpha/beta/gamma via orientation
+    // Try deviceorientationabsolute first
+    const x = e.beta ?? 0; // Fallback
+    const y = e.gamma ?? 0;
+    const z = e.alpha ?? 0;
+    $('magX').textContent = x.toFixed(1);
+    $('magY').textContent = y.toFixed(1);
+    $('magZ').textContent = z.toFixed(1);
+    const total = Math.hypot(x, y, z);
+    $('magVal').textContent = total.toFixed(1);
+    let st = 'Normal';
+    if (total > 100) st = 'Strong field (magnet)';
+    else if (total < 5) st = 'Weak (sensor issue?)';
+    $('magStatus').textContent = st;
+    history.push(total);
+    if (history.length > 100) history.shift();
+    // Draw graph
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#00b3ff';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const maxVal = Math.max(200, ...history);
+    for (let i = 0; i < history.length; i++) {
+      const px = (i / 100) * canvas.width;
+      const py = canvas.height - (history[i] / maxVal) * canvas.height;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  };
+  window.addEventListener('deviceorientationabsolute', magnetHandler);
+  window.addEventListener('deviceorientation', magnetHandler);
+}
+function stopMagnet() {
+  if (magnetHandler) {
+    window.removeEventListener('deviceorientationabsolute', magnetHandler);
+    window.removeEventListener('deviceorientation', magnetHandler);
+    magnetHandler = null;
+  }
+}
+
+/* ---- BATTERY TEST ---- */
+async function testBattery() {
+  $('testTitle').textContent = '🔋 Battery Test';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Battery Health</h2>
+      <p>Live battery status. Charger lagao ya nikaalo, changes dekho.</p>
+      <div class="bigVal" id="batLevel">--</div>
+      <div class="bigLabel">Battery level</div>
+      <div class="batteryBar"><div class="batteryFill" id="batFill" style="width:0%"></div>
+        <div class="batteryText" id="batText">--</div></div>
+      <div class="metric"><span>Charging</span><span class="val" id="batCharging">--</span></div>
+      <div class="metric"><span>Charge time</span><span class="val" id="batChargeTime">--</span></div>
+      <div class="metric"><span>Discharge time</span><span class="val" id="batDischargeTime">--</span></div>
+      <div class="metric"><span>Drain rate</span><span class="val" id="batDrain">--</span></div>
+      <p style="margin-top:12px;font-size:11px">
+        Battery API sirf Chrome mein hai. iOS pe support nahi.
+      </p>
+    </div>
+  `;
+  if (!('getBattery' in navigator)) {
+    $('batLevel').textContent = 'N/A';
+    $('batText').textContent = 'Not supported';
+    return;
+  }
+  const bat = await navigator.getBattery();
+  let lastLevel = bat.level;
+  let lastTime = Date.now();
+  const update = () => {
+    const pct = Math.round(bat.level * 100);
+    $('batLevel').textContent = pct + '%';
+    $('batFill').style.width = pct + '%';
+    $('batText').textContent = pct + '%';
+    $('batCharging').textContent = bat.charging ? 'Yes ⚡' : 'No';
+    if (bat.chargingTime && isFinite(bat.chargingTime)) {
+      $('batChargeTime').textContent = Math.round(bat.chargingTime / 60) + ' min';
+    } else $('batChargeTime').textContent = '--';
+    if (bat.dischargingTime && isFinite(bat.dischargingTime)) {
+      $('batDischargeTime').textContent = Math.round(bat.dischargingTime / 60) + ' min';
+    } else $('batDischargeTime').textContent = '--';
+    const now = Date.now();
+    if (now - lastTime > 5000) {
+      const rate = ((bat.level - lastLevel) * 100) / ((now - lastTime) / 3600000);
+      $('batDrain').textContent = rate.toFixed(2) + ' %/hour';
+      lastLevel = bat.level;
+      lastTime = now;
+    }
+  };
+  update();
+  bat.addEventListener('levelchange', update);
+  bat.addEventListener('chargingchange', update);
+  bat.addEventListener('chargingtimechange', update);
+  bat.addEventListener('dischargingtimechange', update);
+}
+
+/* ---- LEVEL / TILT ---- */
+let levelHandler = null;
+function testLevel() {
+  $('testTitle').textContent = '⚖️ Level / Tilt';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Bubble Level</h2>
+      <p>Phone ko flat rakho — bubble center mein aana chahiye. Board alignment check karne ke liye.</p>
+      <div class="levelView">
+        <div class="levelCross"></div>
+        <div class="levelCircle"></div>
+        <div class="levelBubble" id="levelBubble"></div>
+      </div>
+      <div class="metric"><span>Beta (X tilt)</span><span class="val" id="lvlBeta">--</span></div>
+      <div class="metric"><span>Gamma (Y tilt)</span><span class="val" id="lvlGamma">--</span></div>
+      <div class="metric"><span>Status</span><span class="val" id="lvlStatus">--</span></div>
+      <div class="testActions">
+        <button id="lvlStart" class="primary">▶ Start</button>
+        <button id="lvlStop">⏹ Stop</button>
+      </div>
+    </div>
+  `;
+  $('lvlStart').addEventListener('click', startLevel);
+  $('lvlStop').addEventListener('click', stopLevel);
+}
+function startLevel() {
+  if (!('DeviceOrientationEvent' in window)) {
+    toast('Orientation not supported');
+    return;
+  }
+  const bubble = $('levelBubble');
+  const maxMove = 80;
+  levelHandler = (e) => {
+    const beta = e.beta ?? 0;
+    const gamma = e.gamma ?? 0;
+    $('lvlBeta').textContent = beta.toFixed(1) + '°';
+    $('lvlGamma').textContent = gamma.toFixed(1) + '°';
+    const dx = Math.max(-maxMove, Math.min(maxMove, gamma * 1.5));
+    const dy = Math.max(-maxMove, Math.min(maxMove, beta * 1.5));
+    bubble.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    const total = Math.hypot(beta, gamma);
+    if (total < 2) { $('lvlStatus').textContent = 'LEVEL ✓'; $('lvlStatus').style.color = 'var(--ok)'; }
+    else if (total < 8) { $('lvlStatus').textContent = 'Almost'; $('lvlStatus').style.color = 'var(--warn)'; }
+    else { $('lvlStatus').textContent = 'Tilted'; $('lvlStatus').style.color = 'var(--danger)'; }
+  };
+  window.addEventListener('deviceorientation', levelHandler);
+}
+function stopLevel() {
+  if (levelHandler) {
+    window.removeEventListener('deviceorientation', levelHandler);
+    levelHandler = null;
+  }
+}
+
+/* ---- LIGHT METER ---- */
+function testLight() {
+  $('testTitle').textContent = '💡 Light Meter';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Ambient Light Meter</h2>
+      <p>Camera se brightness measure. Torch on/off karke compare karo.</p>
+      <div class="bigVal" id="lightVal">--</div>
+      <div class="bigLabel">Avg brightness (0-255)</div>
+      <div class="metric"><span>Status</span><span class="val" id="lightStatus">--</span></div>
+      <div class="testActions">
+        <button id="lightStart" class="primary">▶ Start</button>
+        <button id="lightTorch">🔦 Torch</button>
+        <button id="lightStop">⏹ Stop</button>
+      </div>
+    </div>
+  `;
+  let torchState = false;
+  $('lightStart').addEventListener('click', startLight);
+  $('lightStop').addEventListener('click', stopLight);
+  $('lightTorch').addEventListener('click', async () => {
+    if (!caps.torch) { toast('No torch'); return; }
+    torchState = !torchState;
+    await safeApply({ advanced: [{ torch: torchState }] }, 'torch');
+  });
+}
+let lightRAF = null, lightCanvas = null, lightCtx = null;
+function startLight() {
+  lightCanvas = document.createElement('canvas');
+  lightCanvas.width = 50; lightCanvas.height = 50;
+  lightCtx = lightCanvas.getContext('2d');
+  const tick = () => {
+    if (!video.videoWidth) { lightRAF = requestAnimationFrame(tick); return; }
+    lightCtx.drawImage(video, 0, 0, 50, 50);
+    const data = lightCtx.getImageData(0, 0, 50, 50).data;
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      sum += (data[i] + data[i+1] + data[i+2]) / 3;
+    }
+    const avg = sum / (data.length / 4);
+    $('lightVal').textContent = avg.toFixed(0);
+    let st = 'Medium';
+    if (avg < 40) st = 'Very dark';
+    else if (avg < 100) st = 'Dim';
+    else if (avg > 220) st = 'Very bright';
+    $('lightStatus').textContent = st;
+    lightRAF = requestAnimationFrame(tick);
+  };
+  tick();
+}
+function stopLight() {
+  if (lightRAF) cancelAnimationFrame(lightRAF);
+  lightRAF = null;
+}
+
+/* ---- TOUCH TEST ---- */
+function testTouch() {
+  $('testTitle').textContent = '👆 Touch Test';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Multi-Touch / Dead Zone Test</h2>
+      <p>Screen pe ungliyan rako. Jahan touch ho wahan circle aayega. Dead zone = circle nahi banega.</p>
+      <div class="touchGrid" id="touchGrid"></div>
+      <div class="metric"><span>Max touches detected</span><span class="val" id="touchMax">0</span></div>
+      <div class="testActions">
+        <button id="touchReset">Reset</button>
+      </div>
+    </div>
+  `;
+  const grid = $('touchGrid');
+  let maxTouches = 0;
+  const dots = new Map();
+  const update = (e) => {
+    e.preventDefault();
+    const rect = grid.getBoundingClientRect();
+    // Clear dots
+    dots.forEach((el) => el.remove());
+    dots.clear();
+    maxTouches = Math.max(maxTouches, e.touches.length);
+    $('touchMax').textContent = maxTouches;
+    for (let i = 0; i < e.touches.length; i++) {
+      const t = e.touches[i];
+      const dot = document.createElement('div');
+      dot.className = 'touchDot';
+      dot.style.left = (t.clientX - rect.left) + 'px';
+      dot.style.top = (t.clientY - rect.top) + 'px';
+      dot.textContent = i + 1;
+      grid.appendChild(dot);
+      dots.set(i, dot);
+    }
+  };
+  grid.addEventListener('touchstart', update, { passive: false });
+  grid.addEventListener('touchmove', update, { passive: false });
+  grid.addEventListener('touchend', (e) => {
+    dots.forEach((el) => el.remove());
+    dots.clear();
+  });
+  $('touchReset').addEventListener('click', () => {
+    maxTouches = 0;
+    $('touchMax').textContent = '0';
+    dots.forEach((el) => el.remove());
+    dots.clear();
+  });
+}
+
+/* ---- GYROSCOPE ---- */
+let gyroHandler = null;
+function testGyro() {
+  $('testTitle').textContent = '📱 Gyroscope';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Motion / Gyroscope</h2>
+      <p>Phone ghumao. Values change honi chahiye. Sab zero = sensor issue.</p>
+      <div class="metric"><span>Alpha (Z)</span><span class="val" id="gyroA">--</span></div>
+      <div class="metric"><span>Beta (X)</span><span class="val" id="gyroB">--</span></div>
+      <div class="metric"><span>Gamma (Y)</span><span class="val" id="gyroG">--</span></div>
+      <div class="metric"><span>Shake</span><span class="val" id="gyroShake">--</span></div>
+      <div class="testActions">
+        <button id="gyroStart" class="primary">▶ Start</button>
+        <button id="gyroStop">⏹ Stop</button>
+      </div>
+    </div>
+  `;
+  $('gyroStart').addEventListener('click', startGyro);
+  $('gyroStop').addEventListener('click', stopGyro);
+}
+function startGyro() {
+  if (!('DeviceOrientationEvent' in window)) { toast('Not supported'); return; }
+  let lastA = 0, lastB = 0, lastG = 0;
+  gyroHandler = (e) => {
+    const a = e.alpha ?? 0, b = e.beta ?? 0, g = e.gamma ?? 0;
+    $('gyroA').textContent = a.toFixed(1) + '°';
+    $('gyroB').textContent = b.toFixed(1) + '°';
+    $('gyroG').textContent = g.toFixed(1) + '°';
+    const shake = Math.abs(a - lastA) + Math.abs(b - lastB) + Math.abs(g - lastG);
+    $('gyroShake').textContent = shake.toFixed(1);
+    lastA = a; lastB = b; lastG = g;
+  };
+  window.addEventListener('deviceorientation', gyroHandler);
+}
+function stopGyro() {
+  if (gyroHandler) {
+    window.removeEventListener('deviceorientation', gyroHandler);
+    gyroHandler = null;
+  }
+}
+
+/* ---- NETWORK ---- */
+function testNetwork() {
+  $('testTitle').textContent = '📶 Network';
+  $('testContent').innerHTML = `
+    <div class="testView">
+      <h2>Network Status</h2>
+      <p>Online/offline aur connection type.</p>
+      <div class="metric big"><span>Status</span><span class="val" id="netStatus">--</span></div>
+      <div class="metric"><span>Type</span><span class="val" id="netType">--</span></div>
+      <div class="metric"><span>Downlink</span><span class="val" id="netDown">--</span></div>
+      <div class="metric"><span>RTT</span><span class="val" id="netRTT">--</span></div>
+      <div class="metric"><span>Effective type</span><span class="val" id="netEff">--</span></div>
+      <div class="testActions">
+        <button id="netPing" class="primary">Ping Test</button>
+      </div>
+    </div>
+  `;
+  const updateNet = () => {
+    $('netStatus').textContent = navigator.onLine ? '🟢 Online' : '🔴 Offline';
+    $('netStatus').style.color = navigator.onLine ? 'var(--ok)' : 'var(--danger)';
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (c) {
+      $('netType').textContent = c.type || 'unknown';
+      $('netDown').textContent = c.downlink ? c.downlink + ' Mbps' : '--';
+      $('netRTT').textContent = c.rtt ? c.rtt + ' ms' : '--';
+      $('netEff').textContent = c.effectiveType || '--';
+    } else {
+      $('netType').textContent = 'API not available';
+    }
+  };
+  updateNet();
+  window.addEventListener('online', updateNet);
+  window.addEventListener('offline', updateNet);
+  $('netPing').addEventListener('click', async () => {
+    const t0 = performance.now();
+    try {
+      await fetch('https://www.google.com/generate_204?cachebust=' + Date.now(), { mode: 'no-cors' });
+      const t1 = performance.now();
+      toast('Ping: ' + Math.round(t1 - t0) + ' ms');
+    } catch(e) { toast('Ping failed'); }
+  });
+}
+
+/* ---- EAR SPEAKER TEST ---- */
+function testEarSpeaker() {
+  testSpeaker();
+  $('testTitle').textContent = '🎧 Ear Speaker Test';
+  $('testContent').insertAdjacentHTML('afterbegin',
+    '<p style="margin-bottom:12px;color:var(--warn)">Ear speaker test: phone ko kaan pe rakh ke tone suno. Clear aana chahiye.</p>');
+}
+
+/* ================= INIT ================= */
 $('appVer').textContent = APP_VERSION;
 LOG.info('Booting', APP_VERSION);
 loadSettings();
+updateGeminiStatus();
 zoomSlider.max = maxZoomTotal;
 startCamera();
 stage.addEventListener('contextmenu', e => e.preventDefault());
-
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
 });
-
-if (location.protocol !== 'https:' &&
-    location.hostname !== 'localhost' &&
-    location.hostname !== '127.0.0.1') {
-  setTimeout(() => toast('⚠️ Camera needs HTTPS — host on github.io/netlify/vercel', 6000), 1000);
+if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+  setTimeout(() => toast('⚠️ Camera needs HTTPS', 6000), 1000);
 }
-
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
   if (e.key === '+' || e.key === '=') doZoomStep(+1);
   if (e.key === '-' || e.key === '_') doZoomStep(-1);
   if (e.key === ' ') { e.preventDefault(); capturePhoto(); }
-  if (e.key === 'f') $('flipBtn').click();
-  if (e.key === 't') $('torchBtn').click();
 });
 </script>
 </body>
